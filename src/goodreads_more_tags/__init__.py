@@ -1,6 +1,8 @@
-from calibre.ebooks.metadata.sources.base import Source, fixcase, fixauthors
+from __future__ import print_function
 
-__license__   = 'BSD 3-clause'
+from calibre.ebooks.metadata.sources.base import Source
+
+__license__ = 'BSD 3-clause'
 __copyright__ = '2019, Michon van Dooren <michon1992@gmail.com>'
 __docformat__ = 'markdown en'
 
@@ -18,11 +20,24 @@ class GoodreadsMoreTags(Source):
     touched_fields = frozenset(['identifier:goodreads', 'tags'])
 
     def config_widget(self):
-        """
-        Overriding the default configuration screen for our own custom configuration.
-        """
         from .config import ConfigWidget
         return ConfigWidget(self)
+
+    def identify(self, log, result_queue, abort, identifiers = {}, **kwargs):
+        """
+        Gets tags for the already known Goodreads identifier, if one exists.
+
+        This will not get any information for new Goodreads items returned by the Goodreads plugin.
+        """
+        if 'goodreads' not in identifiers:
+            log.warn('No goodreads identifier found, not grabbing extra tags')
+            return
+
+        from .worker import Worker
+        worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue)
+        worker.start()
+        while worker.is_alive() and not abort.is_set():
+            worker.join(0.1)
 
     def cli_main(self, *args, **kwargs):
         from calibre.gui2 import Application
