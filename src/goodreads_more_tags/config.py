@@ -28,8 +28,8 @@ KEY_TRESHOLD_PERCENTAGE_OF = 'tresholdPercentageOf'
 KEY_SHELF_MAPPINGS = 'shelfMappings'
 
 DEFAULT_TRESHOLD_ABSOLUTE = 10
-DEFAULT_TRESHOLD_PERCENTAGE = 20
-DEFAULT_TRESHOLD_PERCENTAGE_OF = '3, 4'
+DEFAULT_TRESHOLD_PERCENTAGE = 50
+DEFAULT_TRESHOLD_PERCENTAGE_OF = [3, 4]
 DEFAULT_SHELF_MAPPINGS = {
     'adult-fiction': ['Adult'],
     'adult': ['Adult'],
@@ -227,6 +227,9 @@ class ShelfTagMappingWidget(qt.QWidget):
         # Add stretch to position the buttons at the top.
         self.button_layout.addStretch()
 
+    def get_mappings(self):
+        return self.table.get_mappings()
+
     def add_mapping(self):
         # Prompt for the shelf name.
         shelf, ok = qt.QInputDialog.getText(
@@ -241,7 +244,7 @@ class ShelfTagMappingWidget(qt.QWidget):
             return
 
         # Add an empty mapping, unless one already exists for this shelf.
-        mappings = self.table.get_mappings()
+        mappings = self.get_mappings()
         if shelf not in mappings:
             mappings[shelf] = []
             self.table.set_mappings(mappings)
@@ -251,7 +254,7 @@ class ShelfTagMappingWidget(qt.QWidget):
 
     def delete_mapping(self):
         # Check whether anything is selected.
-        shelf = self.table.get_selected_shelf()
+        shelf = self.get_selected_shelf()
         if not shelf:
             return
 
@@ -264,7 +267,7 @@ class ShelfTagMappingWidget(qt.QWidget):
             return
 
         # Remove the mapping.
-        mappings = self.table.get_mappings()
+        mappings = self.get_mappings()
         del mappings[shelf]
         self.table.set_mappings(mappings)
 
@@ -298,8 +301,6 @@ class PseudoFormLayoutWithHelp(qt.QGridLayout):
     A QGridLayout that has been modified to work sort of like a QFormLayout, but with a third element in each row to
     provide "help" text for the row.
     """
-    PIXMAP = qt.QIcon(I('dialog_question.png')).pixmap(16, 16)
-
     def addRow(self, label, widget, description = None):
         row = self.rowCount()
 
@@ -308,7 +309,8 @@ class PseudoFormLayoutWithHelp(qt.QGridLayout):
         self.addWidget(label, row, 0)
 
         if description:
-            tooltip_icon = ToolTipIcon(PseudoFormLayoutWithHelp.PIXMAP, description)
+            pixmap = qt.QIcon(I('dialog_question.png')).pixmap(16, 16)
+            tooltip_icon = ToolTipIcon(pixmap, description)
             self.addWidget(tooltip_icon, row, 1)
 
         self.addWidget(widget, row, 2)
@@ -399,7 +401,7 @@ class ConfigWidget(DefaultConfigWidget):
         # A setting to determine what the previous setting is based on.
         self.treshold_pct_of = qt.QLineEdit()
         self.treshold_pct_of.setValidator(qt.QRegExpValidator(qt.QRegExp(r'^[0-9]+(,\s*[0-9]+)*$')))
-        self.treshold_pct_of.setText(config[KEY_TRESHOLD_PERCENTAGE_OF])
+        self.treshold_pct_of.setText(', '.join([str(p) for p in config[KEY_TRESHOLD_PERCENTAGE_OF]]))
         self.gb_ext.l.addRow('Treshold percentage is based on', self.treshold_pct_of, description = docmd2html((
             '''
             What the percentage specified in the previous setting is based on. This is expressed as a comma-separated
