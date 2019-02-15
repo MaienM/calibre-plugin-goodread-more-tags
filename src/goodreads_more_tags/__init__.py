@@ -19,6 +19,22 @@ class GoodreadsMoreTags(Source):
     capabilities = frozenset(['identify'])
     touched_fields = frozenset(['identifier:goodreads', 'tags'])
 
+    def __init__(self, *args, **kwargs):
+        Source.__init__(self, *args, **kwargs)
+
+        # Try to inject into the regular Goodreads plugin. If this succeeds, this means our worker is integrated with
+        # their worker, so we don't need to do anything in our identify. If this fails, we do want to perform our
+        # identify as normal. The advantage of this integration is that it works for items that don't already have a
+        # goodreads identifier.
+        self.is_integrated = False
+        try:
+            from .goodreads_integration import inject_into_goodreads
+            inject_into_goodreads()
+            self.is_integrated = True
+        except ImportError:
+            pass
+        print('Integration status: ', self.is_integrated)
+
     def config_widget(self):
         from .config import ConfigWidget
         return ConfigWidget(self)
@@ -27,8 +43,13 @@ class GoodreadsMoreTags(Source):
         """
         Gets tags for the already known Goodreads identifier, if one exists.
 
+        This will do nothing if the integration with the regular Goodreads plugin was successful.
+
         This will not get any information for new Goodreads items returned by the Goodreads plugin.
         """
+        if self.is_integrated:
+            return
+
         if 'goodreads' not in identifiers:
             log.warn('No goodreads identifier found, not grabbing extra tags')
             return
