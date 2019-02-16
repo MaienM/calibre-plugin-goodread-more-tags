@@ -41,24 +41,42 @@ class GoodreadsMoreTags(Source):
 
     def identify(self, log, result_queue, abort, identifiers = {}, **kwargs):
         """
-        Gets tags for the already known Goodreads identifier, if one exists.
-
-        This will do nothing if the integration with the regular Goodreads plugin was successful.
-
-        This will not get any information for new Goodreads items returned by the Goodreads plugin.
+        Gets additional tags for Goodreads results.
+        
+        If the integration with the base Goodreads plugin was successful, this will get tags for all results returned by
+        that. If not, it will only get tags if the current set of identifiers contains one for Goodreads.
         """
-        if self.is_integrated:
-            return
-
-        if 'goodreads' not in identifiers:
-            log.warn('No goodreads identifier found, not grabbing extra tags')
-            return
-
         from .worker import Worker
-        worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue)
-        worker.start()
-        while worker.is_alive() and not abort.is_set():
-            worker.join(0.1)
+        workers = []
+
+        if not self.is_integrated:
+            if 'goodreads' not in identifiers:
+                log.warn('No goodreads identifier found, not grabbing extra tags')
+                return
+            worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue)
+            worker.start()
+            workers.append(worker)
+
+        else:
+            from .goodreads_integration import QueueHandler
+            queue = QueueHandler.get_instance().get_queue(abort)
+            workers = []
+            while True:
+                identifier = queue.get()
+                if identifier is None:
+                    break
+                worker = Worker(self, identifier, log = log, result_queue = result_queue)
+                worker.start()
+                workers.append(worker)
+
+        while not abort.is_set():
+            for worker in workers:
+                if worker.is_alive():
+                    worker.join(0.1)
+                    break
+            else:
+                # All of the workers are done, so we can continue now
+                break
 
     def cli_main(self, *args, **kwargs):
         from calibre.gui2 import Application
@@ -81,3 +99,32 @@ class GoodreadsMoreTags(Source):
 
         app.exec_()
 
+
+if __name__ == '__main__':
+    # To run these test use:
+    # calibre-debug -e __init__.py
+    from calibre.ebooks.metadata.sources.test import test_identify_plugin, tags_test
+    from calibre_plugins.goodreads import Goodreads
+
+    test_identify_plugin(Goodreads.name, [
+        (  # A book with an ISBN
+            { 'identifiers': {'isbn': '9780385340588' }, 'title': '61 Hours', 'authors': ['Lee Child'] },
+            [],
+        ),
+        # (  # A book throwing an index error
+        #     { 'title': 'The Girl Hunters', 'authors': ['Mickey Spillane'] },
+        #     [],
+        # ),
+        # (  # A book with no ISBN specified
+        #     { 'title': "Playing with Fire", 'authors': ['Derek Landy'] },
+        #     [],
+        # ),
+        # (  # A book with a Goodreads id
+        #     { 'identifiers': { 'goodreads': '6977769' }, 'title': '61 Hours', 'authors': ['Lee Child'] },
+        #     [],
+        # ),
+        # (  # A book with a Goodreads id
+        #     { 'identifiers': { 'goodreads': '5907' } },
+        #     [tags_test(['Adventure', 'Classics', 'Fantasy', 'Science Fiction', 'Young Adult'])],
+        # ),
+    ])

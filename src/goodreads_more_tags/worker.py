@@ -67,8 +67,6 @@ class Worker(Thread):
         self.url = URL_TEMPLATE.format(identifier = identifier)
         self.prefs = plugin_prefs[STORE_NAME]
 
-        self.log.debug('> Creating worker for ', self.url)
-
     def run(self):
         # Try to grab the page contents.
         try:
@@ -111,7 +109,7 @@ class Worker(Thread):
         # Apply the absolute treshold.
         treshold_abs = self.prefs[KEY_TRESHOLD_ABSOLUTE]
         tags.apply_treshold(treshold_abs)
-        self.log.debug('Tags after applying absolute treshold', tags)
+        self.log.debug('Tags after applying absolute treshold:', tags)
 
         # Calculate the percentage treshold.
         treshold_pct_places = self.prefs[KEY_TRESHOLD_PERCENTAGE_OF]
@@ -128,7 +126,7 @@ class Worker(Thread):
 
         # Apply the percentage treshold.
         tags.apply_treshold(treshold_pct)
-        self.log.debug('Tags after applying percentage treshold', tags)
+        self.log.debug('Tags after applying percentage treshold:', tags)
 
         # Store the results
         mi = Metadata(None)
