@@ -101,29 +101,47 @@ class TemporaryQueue(object):
             self.condition.release()
 
 
-def injected_identify(self, log, result_queue, abort, *args, **kwargs):
-    print('>>> Custom identify')
+def intercept_method(instance, method, interceptor):
+    """
+    A helper to create an intercept for a method.
 
+    The instance and method describe where the original method can be found. That is, getattr(instance, method) should
+    return the method.
+
+    The interceptor will be called in place of the original method. The original method will be available as a property
+    '_{method}_original' on the instance.
+    """
+    key = '_{}_original'.format(method)
+    if not getattr(instance, key, False):
+        setattr(instance, key, getattr(instance, method))
+        setattr(instance, method, interceptor)
+
+
+def intercept_Goodreads_identify(self, log, result_queue, abort, *args, **kwargs):
     # Store the abort instance, as it will be used as a session identifier.
     self.__abort_for_more_tags = abort
 
     # Run the original identify.
-    injected_identify.original(self, log, result_queue, abort, *args, **kwargs)
-
-    # Indicate that the session is now finished.
-    QueueHandler.get_instance().remove_queue(abort)
+    return self._identify_original(log, result_queue, abort, *args, **kwargs)
 
 
-def injected_run(self):
-    print('>>> Custom worker run')
+def intercept_Goodreads_Worker_init(self, *args, **kwargs):
+    # Run the regular init.
+    self.___init___original(*args, **kwargs)
 
     # Put the data for this worker on the appropriate queue, so that the identify() can start corresponding workers.
     identifier = self.plugin.id_from_url(self.url)[1]
     queue = QueueHandler.get_instance().get_queue(self.plugin.__abort_for_more_tags)
     queue.put(identifier)
 
+
+def intercept_Goodreads_Worker_run(self):
+    # The Goodreads plugin will only start running the workers after creating all of them, so we know that the
+    # TemporaryQueue can be closed at this time.
+    QueueHandler.get_instance().remove_queue(self.plugin.__abort_for_more_tags)
+
     # Run the regular worker.
-    injected_run.original(self)
+    return self._run_original()
 
 
 def inject_into_goodreads():
@@ -134,11 +152,6 @@ def inject_into_goodreads():
     It does this by modifying some of the methods to interact with the QueueHandler and TemporaryQueues to provide the
     needed data to the identify method of this plugin.
     """
-    if not getattr(Goodreads, '_more_tags_injected', False):
-        injected_identify.original = Goodreads.identify
-        Goodreads.identify = injected_identify
-        Goodreads._more_tags_injected = True
-    if not getattr(OriginalWorker, '_more_tags_injected', False):
-        injected_run.original = OriginalWorker.run
-        OriginalWorker.run = injected_run
-        OriginalWorker._more_tags_injected = True
+    intercept_method(Goodreads, 'identify', intercept_Goodreads_identify)
+    intercept_method(OriginalWorker, '__init__', intercept_Goodreads_Worker_init)
+    intercept_method(OriginalWorker, 'run', intercept_Goodreads_Worker_run)
