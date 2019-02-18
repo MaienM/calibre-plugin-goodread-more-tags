@@ -80,23 +80,3 @@ class GoodreadsMoreTags(Source):
                 # All of the workers are done, so we can continue now
                 break
 
-    def cli_main(self, *args, **kwargs):
-        from calibre.gui2 import Application
-        app = Application([])
-        plugin = GoodreadsMoreTags(__file__)
-        config = plugin.config_widget()
-        config.show()
-
-        _locals = locals()
-        def embed():
-            import IPython
-            app = _locals['app']
-            plugin = _locals['plugin']
-            config = _locals['config']
-            IPython.embed()
-        import threading
-        thread = threading.Thread(target = embed)
-        thread.daemon = True
-        thread.start()
-
-        app.exec_()
