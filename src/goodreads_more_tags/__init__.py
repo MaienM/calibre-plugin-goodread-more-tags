@@ -98,33 +98,3 @@ class GoodreadsMoreTags(Source):
         thread.start()
 
         app.exec_()
-
-
-if __name__ == '__main__':
-    # To run these test use:
-    # calibre-debug -e __init__.py
-    from calibre.ebooks.metadata.sources.test import test_identify_plugin, tags_test
-    from calibre_plugins.goodreads import Goodreads
-
-    test_identify_plugin(Goodreads.name, [
-        (  # A book with an ISBN
-            { 'identifiers': {'isbn': '9780385340588' }, 'title': '61 Hours', 'authors': ['Lee Child'] },
-            [],
-        ),
-        # (  # A book throwing an index error
-        #     { 'title': 'The Girl Hunters', 'authors': ['Mickey Spillane'] },
-        #     [],
-        # ),
-        # (  # A book with no ISBN specified
-        #     { 'title': "Playing with Fire", 'authors': ['Derek Landy'] },
-        #     [],
-        # ),
-        # (  # A book with a Goodreads id
-        #     { 'identifiers': { 'goodreads': '6977769' }, 'title': '61 Hours', 'authors': ['Lee Child'] },
-        #     [],
-        # ),
-        # (  # A book with a Goodreads id
-        #     { 'identifiers': { 'goodreads': '5907' } },
-        #     [tags_test(['Adventure', 'Classics', 'Fantasy', 'Science Fiction', 'Young Adult'])],
-        # ),
-    ])
