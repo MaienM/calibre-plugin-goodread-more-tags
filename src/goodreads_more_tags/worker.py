@@ -23,7 +23,17 @@ URL_TEMPLATE = 'https://www.goodreads.com/book/shelves/{identifier}'
 class TagList(Counter):
     """ A list of tags with the amount of people that 'voted' for the tag. """
     def apply_treshold(self, treshold):
-        """ Apply a treshold, removing all items with a value below the treshold. """
+        """
+        Apply a treshold, removing all items with a value below the treshold.
+
+        >>> c = TagList(a = 20, b = 10, c = 5, d = 3, e = 2, f = 1)
+        >>> c.apply_treshold(4)
+        >>> sorted(c.keys())
+        ['a', 'b', 'c']
+        >>> c.apply_treshold(10)
+        >>> sorted(c.keys())
+        ['a', 'b']
+        """
         for key, count in self.items():
             if count < treshold:
                 del self[key]
