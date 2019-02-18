@@ -38,11 +38,11 @@ class TagList(Counter):
 
         If a place is requested that is not present, the result will be None.
 
-        >>> c = Counter(a = 20, b = 10, c = 5, d = 3, e = 2, f = 1)
+        >>> c = TagList(a = 20, b = 10, c = 5, d = 3, e = 2, f = 1)
         >>> c.get_places([1])
         [('a', 20)]
         >>> c.get_places([3, 5])
-        [('c', 5), ('a', 2)]
+        [('c', 5), ('e', 2)]
         >>> c.get_places([4, 20])
         [('d', 3), None]
         """
