@@ -1,0 +1,6 @@
+pytest ~= 3.6.0
+pluggy < 0.8
+pytest-cov
+pytest-randomly
+pytest-timeout
+pytest-xdist
