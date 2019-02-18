@@ -1,8 +1,7 @@
+from __future__ import unicode_literals
+
 from Queue import Queue, Empty
 from threading import Condition, Event, Lock
-
-from calibre_plugins.goodreads import Goodreads
-from calibre_plugins.goodreads.worker import Worker as OriginalWorker
 
 
 # The goals of is to be able to provide tags for all results of the Goodreads plugin.
@@ -152,6 +151,9 @@ def inject_into_goodreads():
     It does this by modifying some of the methods to interact with the QueueHandler and TemporaryQueues to provide the
     needed data to the identify method of this plugin.
     """
+    from calibre_plugins.goodreads import Goodreads
+    from calibre_plugins.goodreads.worker import Worker as OriginalWorker
+
     intercept_method(Goodreads, 'identify', intercept_Goodreads_identify)
     intercept_method(OriginalWorker, '__init__', intercept_Goodreads_Worker_init)
     intercept_method(OriginalWorker, 'run', intercept_Goodreads_Worker_run)
