@@ -54,7 +54,7 @@ class TagList(Counter):
 class Worker(Thread):
     """ Get shelves that a Goodreads book belongs to, and convert these to tags. """
 
-    def __init__(self, plugin, identifier, log = None, result_queue = None, timeout = 30):
+    def __init__(self, plugin, identifier, log = None, result_queue = None, timeout = 30, **data):
         Thread.__init__(self)
         self.daemon = True
 
@@ -63,6 +63,7 @@ class Worker(Thread):
         self.log = log
         self.result_queue = result_queue
         self.timeout = timeout
+        self.data = data
 
         self.browser = plugin.browser.clone_browser()
         self.url = URL_TEMPLATE.format(identifier = identifier)
@@ -144,8 +145,10 @@ class Worker(Thread):
         self.log.debug('[{}] Tags after applying percentage treshold: {}'.format(self.identifier, tags))
 
         # Store the results
-        mi = Metadata(None)
-        mi.identifiers = { 'goodreads': self.identifier }
-        mi.tags = tags.keys()
-        self.result_queue.put(mi)
+        meta = Metadata(None)
+        for k, v in self.data.items():
+            meta.set(k, v)
+        meta.set_identifier('goodreads', self.identifier)
+        meta.tags = tags.keys()
+        self.result_queue.put(meta)
 

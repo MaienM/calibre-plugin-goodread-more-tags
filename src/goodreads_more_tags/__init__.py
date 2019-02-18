@@ -55,7 +55,7 @@ class GoodreadsMoreTags(Source):
             if 'goodreads' not in identifiers:
                 log.warn('No goodreads identifier found, not grabbing extra tags')
                 return
-            worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue)
+            worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue, **kwargs)
             worker.start()
             workers.append(worker)
 
@@ -67,7 +67,7 @@ class GoodreadsMoreTags(Source):
                 identifier = queue.get()
                 if identifier is None:
                     break
-                worker = Worker(self, identifier, log = log, result_queue = result_queue)
+                worker = Worker(self, identifier, log = log, result_queue = result_queue, **kwargs)
                 worker.start()
                 workers.append(worker)
 
