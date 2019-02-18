@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import unicode_literals
 
 from calibre.ebooks.metadata.sources.base import Source
 
@@ -48,6 +49,7 @@ class GoodreadsMoreTags(Source):
         """
         from .worker import Worker
         workers = []
+        log.debug('*' * 20)
 
         if not self.is_integrated:
             if 'goodreads' not in identifiers:

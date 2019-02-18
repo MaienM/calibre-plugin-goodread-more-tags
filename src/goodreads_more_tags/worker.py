@@ -1,5 +1,6 @@
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
 
 from collections import Counter
 from threading import Thread
@@ -70,10 +71,14 @@ class Worker(Thread):
     def run(self):
         # Try to grab the page contents.
         try:
-            self.log.info('Retrieving shelves for goodreads book {identifier} from {url}'.format(**vars(self)))
+            self.log.info('[{}] Retrieving shelves from {}'.format(self.identifier, self.url))
             data = self.browser.open_novisit(self.url, timeout = self.timeout).read()
         except Exception as e:
-            self.log.error('Failed to retrieve {url}: {error}'.format(url = self.url, error = e.message))
+            self.log.error('[{identifier}] Failed to retrieve {url}: {error}'.format(
+                identifier = self.identifier,
+                url = self.url,
+                error = e.message,
+            ))
             return
 
         # Try to parse the page contents.
@@ -81,7 +86,11 @@ class Worker(Thread):
             data = data.decode('utf-8', errors = 'replace').strip()
             root = fromstring(clean_ascii_chars(data))
         except Exception as e:
-            self.log.error('Failed to parse result of {url}: {error}'.format(url = self.url, error = e.message))
+            self.log.error('[{identifier}] Failed to parse result of {url}: {error}'.format(
+                identifier = self.identifier,
+                url = self.url,
+                error = e.message,
+            ))
             return
 
         # Grab the shelves counters.
@@ -92,9 +101,9 @@ class Worker(Thread):
             count = int(count.split()[0].replace(',', ''))
             shelves[name] = count
         if not shelves:
-            self.log.error('Failed to find any shelf info on {url}'.format(url = self.url))
+            self.log.error('[{}] Failed to find any shelf info on {}'.format(self.identifier, self.url))
             return
-        self.log.debug('Found shelves:', shelves)
+        self.log.debug('[{}] Found shelves: {}'.format(self.identifier, shelves))
 
         # Map the shelves to the corresponding tags.
         tags = TagList()
@@ -104,29 +113,35 @@ class Worker(Thread):
                 continue
             for tag in mapping[name]:
                 tags[tag] += count
-        self.log.debug('Tags after mapping:', tags)
+        self.log.debug('[{}] Tags after mapping: {}'.format(self.identifier, tags))
 
         # Apply the absolute treshold.
         treshold_abs = self.prefs[KEY_TRESHOLD_ABSOLUTE]
         tags.apply_treshold(treshold_abs)
-        self.log.debug('Tags after applying absolute treshold:', tags)
+        self.log.debug('[{}] Tags after applying absolute treshold: {}'.format(self.identifier, tags))
 
         # Calculate the percentage treshold.
         treshold_pct_places = self.prefs[KEY_TRESHOLD_PERCENTAGE_OF]
-        self.log.debug('Percentage treshold will be based on the tags in the following places:', treshold_pct_places)
+        self.log.debug('[{}] Percentage treshold will be based on the tags in the following places: {}'.format(
+            self.identifier,
+            treshold_pct_places,
+        ))
         treshold_pct_items = filter(bool, tags.get_places(treshold_pct_places))
-        self.log.debug('Percentage treshold will be based on the following tags:', treshold_pct_items)
+        self.log.debug('[{}] Percentage treshold will be based on the following tags: {}'.format(
+            self.identifier,
+            treshold_pct_items,
+        ))
         if treshold_pct_items:
             treshold_pct_base = sum([item[1] for item in treshold_pct_items]) / len(treshold_pct_items)
         else:
             treshold_pct_base = 0
-        self.log.debug('Percentage treshold base is:', treshold_pct_base)
+        self.log.debug('[{}] Percentage treshold base is: {}'.format(self.identifier, treshold_pct_base))
         treshold_pct = treshold_pct_base * self.prefs[KEY_TRESHOLD_PERCENTAGE] / 100
-        self.log.debug('Percentage treshold is:', treshold_pct)
+        self.log.debug('[{}] Percentage treshold is: {}'.format(self.identifier, treshold_pct))
 
         # Apply the percentage treshold.
         tags.apply_treshold(treshold_pct)
-        self.log.debug('Tags after applying percentage treshold:', tags)
+        self.log.debug('[{}] Tags after applying percentage treshold: {}'.format(self.identifier, tags))
 
         # Store the results
         mi = Metadata(None)
