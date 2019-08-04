@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from __future__ import with_statement
 
 from Queue import Queue, Empty
 from threading import Condition, Event, Lock
@@ -17,7 +18,7 @@ class QueueHandler(object):
     The abort instance is used as identifier for the session, as this is a separate instance per session, but shared
     across all identify calls in said session.
 
-    This is instended to be a singleton.
+    This is intended to used as a singleton.
     """
     def __init__(self):
         self.lock = Lock()
@@ -32,25 +33,19 @@ class QueueHandler(object):
 
     def get_queue(self, abort):
         """ Get a TemporaryQueue instance for the given session. """
-        self.lock.acquire()
-        try:
+        with self.lock:
             if abort not in self.queues:
                 self.queues[abort] = TemporaryQueue()
             return self.queues[abort]
-        finally:
-            self.lock.release()
 
     def remove_queue(self, abort):
         """ Remove a TemporaryQueue instance that is no longer needed. """
-        self.lock.acquire()
-        try:
+        with self.lock:
             if abort not in self.queues:
                 return
             queue = self.queues[abort]
             queue.kill()
             del self.queues[abort]
-        finally:
-            self.lock.release()
 
 
 class TemporaryQueue(object):
@@ -69,12 +64,9 @@ class TemporaryQueue(object):
         """ Add a piece of data to the queue. """
         if self.done.is_set():
             raise Exception('You cannot add data to a dead queue')
-        self.condition.acquire()
-        try:
+        with self.condition:
             self.queue.put(data)
             self.condition.notify()
-        finally:
-            self.condition.release()
 
     def get(self):
         """
@@ -83,21 +75,27 @@ class TemporaryQueue(object):
         If no data is available, this will wait until data becomes available, or until the queue is killed, in which case
         this will return None.
         """
-        while not self.done.is_set():
+        while not self.done.is_set() or not self.queue.empty():
             try:
-                return self.queue.get_nowait()
+                result = self.queue.get_nowait()
+                return result
             except Empty:
-                self.condition.acquire()
-                self.condition.wait()
+                with self.condition:
+                    self.condition.wait()
 
     def kill(self):
         """ Indicates that no further data will arrive. """
         self.done.set()
-        self.condition.acquire()
-        try:
+        with self.condition:
             self.condition.notifyAll()
-        finally:
-            self.condition.release()
+
+
+class SharedData(object):
+    """ Shared data between a goodreads worker and a goodreads more tags worker.  """
+    def __init__(self, identifier):
+        self.identifier = identifier
+        self.results = Queue()
+        self.is_done = Event()
 
 
 def intercept_method(instance, method, interceptor):
@@ -113,6 +111,7 @@ def intercept_method(instance, method, interceptor):
     key = '_{}_original'.format(method)
     if not getattr(instance, key, False):
         setattr(instance, key, getattr(instance, method))
+    if getattr(instance, method) != interceptor:
         setattr(instance, method, interceptor)
 
 
@@ -130,8 +129,9 @@ def intercept_Goodreads_Worker_init(self, *args, **kwargs):
 
     # Put the data for this worker on the appropriate queue, so that the identify() can start corresponding workers.
     identifier = self.plugin.id_from_url(self.url)[1]
+    shared_data = self.__shared_data_for_more_tags = SharedData(identifier)
     queue = QueueHandler.get_instance().get_queue(self.plugin.__abort_for_more_tags)
-    queue.put(identifier)
+    queue.put(shared_data)
 
 
 def intercept_Goodreads_Worker_run(self):
@@ -139,8 +139,23 @@ def intercept_Goodreads_Worker_run(self):
     # TemporaryQueue can be closed at this time.
     QueueHandler.get_instance().remove_queue(self.plugin.__abort_for_more_tags)
 
+    # Use a different queue to capture the results.
+    shared_data = self.__shared_data_for_more_tags
+    queue = self.result_queue
+    self.result_queue = Queue()
+
     # Run the regular worker.
-    return self._run_original()
+    result = self._run_original()
+
+    # Add the results to the real result queue, and to the shared data, and then mark as done in the shared data.
+    while not self.result_queue.empty():
+        result = self.result_queue.get()
+        queue.put(result)
+        shared_data.results.put(result)
+    shared_data.is_done.set()
+    self.result_queue = queue
+
+    return result
 
 
 def inject_into_goodreads():

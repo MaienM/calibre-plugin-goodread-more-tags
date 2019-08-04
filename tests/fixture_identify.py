@@ -9,7 +9,7 @@ import pytest
 
 
 @pytest.fixture
-def identify(request):
+def identify():
     from calibre.ebooks.metadata.sources.identify import identify as calibre_identify
     from calibre.ebooks.metadata.sources.test import create_log
 

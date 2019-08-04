@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 from __future__ import with_statement
 
+import os.path
+import re
 import time
 from threading import Event, Thread
 
@@ -132,7 +134,25 @@ class TestInterceptMethod(object):
 
 
 class TestIdentifyIntegrated(object):
-    def test_goodreads_id(self, identify):
+    def add_browser_mock(self, browser, url_regex, filename):
+        basedir = os.path.join(os.path.dirname(__file__), '_responses')
+        with open(os.path.join(basedir, filename), 'rb') as file:
+            browser.add_response(re.compile(url_regex), file.read())
+
+    def setup_browser_mock(self, browser):
+        basedir = os.path.join(os.path.dirname(__file__), '_responses')
+        self.add_browser_mock(browser, r'^https?://(www\.)?goodreads\.com/book/show/\d+\D*$', 'book-902715.html')
+        self.add_browser_mock(browser, r'^https?://(www\.)?goodreads\.com/book/shelves/\d+\D*$', 'shelves-902715.html')
+        self.add_browser_mock(browser, r'^https?://i\.gr-assets\.com/images/.*/books/.*/\d+\..*\.jpg$', 'cover-902715.jpg')
+        self.add_browser_mock(
+            browser,
+            r'^https?://(www\.)?goodreads\.com/book/auto_complete\?format=json&q=9780575077881$',
+            'autocomplete-9780575077881.json',
+        )
+
+    @pytest.mark.parametrize('execution_number', range(5))
+    def test_goodreads_id(self, identify, browser, execution_number):
+        self.setup_browser_mock(browser)
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'goodreads': '902715' })
         assert len(results) == 1
         assert sorted(results[0].tags) == [
@@ -142,7 +162,9 @@ class TestIdentifyIntegrated(object):
             'War',
         ]
 
-    def test_isbn(self, identify):
+    @pytest.mark.parametrize('execution_number', range(5))
+    def test_isbn(self, identify, browser, execution_number):
+        self.setup_browser_mock(browser)
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'isbn': '9780575077881' })
         assert len(results) == 1
         assert sorted(results[0].tags) == [

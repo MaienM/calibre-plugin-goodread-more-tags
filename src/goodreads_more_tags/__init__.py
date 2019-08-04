@@ -1,6 +1,8 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from Queue import Queue
+
 from calibre.ebooks.metadata.sources.base import Source
 
 __license__ = 'BSD 3-clause'
@@ -34,7 +36,7 @@ class GoodreadsMoreTags(Source):
             self.is_integrated = True
         except ImportError:
             pass
-        print('Integration status: ', self.is_integrated)
+        print('Integration status:', self.is_integrated)
 
     def config_widget(self):
         from .config import ConfigWidget
@@ -49,26 +51,32 @@ class GoodreadsMoreTags(Source):
         """
         from .worker import Worker
         workers = []
+        shared_data = {}
+        temp_queue = Queue()
         log.debug('*' * 20)
 
         if not self.is_integrated:
+            # No integration, so only proceed if there is a known goodreads identifier.
             if 'goodreads' not in identifiers:
                 log.warn('No goodreads identifier found, not grabbing extra tags')
                 return
+            # No need to use the temp_queue, as there will be no goodreads results to map to anyway.
             worker = Worker(self, identifiers['goodreads'], log = log, result_queue = result_queue, **kwargs)
             worker.start()
             workers.append(worker)
 
         else:
+            # Integration is enabled, so get the identifiers from the shared data.
             from .goodreads_integration import QueueHandler
             queue = QueueHandler.get_instance().get_queue(abort)
             workers = []
-            while True:
-                identifier = queue.get()
-                if identifier is None:
+            while not abort.is_set():
+                shared_datum = queue.get()
+                if shared_datum is None:
                     break
-                worker = Worker(self, identifier, log = log, result_queue = result_queue, **kwargs)
+                worker = Worker(self, shared_datum.identifier, log = log, result_queue = temp_queue, **kwargs)
                 worker.start()
+                shared_data[shared_datum.identifier] = shared_datum
                 workers.append(worker)
 
         while not abort.is_set():
@@ -79,4 +87,23 @@ class GoodreadsMoreTags(Source):
             else:
                 # All of the workers are done, so we can continue now
                 break
+
+        # Results are only merged if the title and authors are the same, so copy these values from the corresponding
+        # goodreads results, if any.
+        while not abort.is_set() and not temp_queue.empty():
+            result = temp_queue.get()
+            shared_datum = shared_data.get(result.identifiers['goodreads'])
+            if shared_datum is None:
+                result_queue.put(result)
+                continue
+            shared_datum.is_done.wait()
+
+            goodreads_result = shared_datum.results.get()
+            if goodreads_result is None:
+                result_queue.put(result)
+                continue
+
+            result.title = goodreads_result.title
+            result.authors = goodreads_result.authors
+            result_queue.put(result)
 
