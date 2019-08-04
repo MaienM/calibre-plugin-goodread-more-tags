@@ -25,8 +25,8 @@ class GoodreadsMoreTags(Source):
     def __init__(self, *args, **kwargs):
         Source.__init__(self, *args, **kwargs)
 
-        # Try to inject into the regular Goodreads plugin. If this succeeds, this means our worker is integrated with
-        # their worker, so we don't need to do anything in our identify. If this fails, we do want to perform our
+        # Try to inject into the regular Goodreads plugin. If this succeeds, this will provide data for use in our
+        # identify (identifiers and results for all Goodreads results). If this fails, we do want to perform our
         # identify as normal. The advantage of this integration is that it works for items that don't already have a
         # goodreads identifier.
         self.is_integrated = False
