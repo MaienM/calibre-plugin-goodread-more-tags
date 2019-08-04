@@ -128,30 +128,38 @@ class Worker(Thread):
         # Apply the absolute threshold.
         threshold_abs = self.prefs[KEY_THRESHOLD_ABSOLUTE]
         tags.apply_threshold(threshold_abs)
-        self.log.debug('[{}] Tags after applying absolute threshold: {}'.format(self.identifier, tags))
+        self.log.debug('[{}] Tags after applying absolute threshold ({}): {}'.format(
+            self.identifier,
+            threshold_abs,
+            tags,
+        ))
 
         # Calculate the percentage threshold.
         threshold_pct_places = self.prefs[KEY_THRESHOLD_PERCENTAGE_OF]
-        self.log.debug('[{}] Percentage threshold will be based on the tags in the following places: {}'.format(
+        threshold_pct_items = filter(bool, tags.get_places(threshold_pct_places))
+        self.log.debug('[{}] Percentage threshold will be based on the following tags ({}): {}'.format(
             self.identifier,
             threshold_pct_places,
-        ))
-        threshold_pct_items = filter(bool, tags.get_places(threshold_pct_places))
-        self.log.debug('[{}] Percentage threshold will be based on the following tags: {}'.format(
-            self.identifier,
             threshold_pct_items,
         ))
         if threshold_pct_items:
             threshold_pct_base = sum([item[1] for item in threshold_pct_items]) / len(threshold_pct_items)
         else:
             threshold_pct_base = 0
-        self.log.debug('[{}] Percentage threshold base is: {}'.format(self.identifier, threshold_pct_base))
         threshold_pct = threshold_pct_base * self.prefs[KEY_THRESHOLD_PERCENTAGE] / 100
-        self.log.debug('[{}] Percentage threshold is: {}'.format(self.identifier, threshold_pct))
+        self.log.debug('[{}] Percentage threshold is {}% of {}'.format(
+            self.identifier,
+            self.prefs[KEY_THRESHOLD_PERCENTAGE],
+            threshold_pct_base,
+        ))
 
         # Apply the percentage threshold.
         tags.apply_threshold(threshold_pct)
-        self.log.debug('[{}] Tags after applying percentage threshold: {}'.format(self.identifier, tags))
+        self.log.debug('[{}] Tags after applying percentage threshold ({}): {}'.format(
+            self.identifier,
+            threshold_pct,
+            tags,
+        ))
 
         # Store the results
         meta = Metadata(None)
