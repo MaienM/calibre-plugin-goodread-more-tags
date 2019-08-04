@@ -16,9 +16,15 @@ sys.extensions_location = '/usr/lib/calibre/calibre/plugins'
 from calibre.customize.ui import all_metadata_plugins  # noqa
 
 
+collect_ignore = [
+    'scripts/',
+]
+
+
 __all__ = [
     'all_metadata_plugins',
     'browser',
+    'collect_ignore',
     'configs',
     'fix_underscore',
     'identify',
