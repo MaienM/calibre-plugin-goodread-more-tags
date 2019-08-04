@@ -17,8 +17,6 @@ class MockBrowser(object):
         self._responses.append((url_regex, response))
 
     def open_novisit(self, url, *args, **kwargs):
-        # Calibre's identify doesn't seem to handle instantaneous responses properly, so let's pretend it takes a bit.
-        time.sleep(1)
         for url_regex, response in self._responses:
             match = url_regex.match(url)
             if match:
