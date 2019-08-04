@@ -1,0 +1,32 @@
+# Goodreads More Tags
+
+This plugin scrapes the shelves page of Goodreads to provide more tags than the top 4 (which are shown on the main page
+and scraped by the Goodreads plugin).
+
+This plugin will only provide tags. It is meant to be used as a companion to the
+[Goodreads plugin](https://www.mobileread.com/forums/showthread.php?t=130638), and it is essentially an extended version
+of the genre -> tag mapping included in that plugin.
+
+## Main Features
+
+- Can retrieve the shelves page of Goodreads to provide more tags.
+- Customizable mapping from shelf name -> tags. A shelf can be mapped to multiple tags, and multiple shelves can map to the same tag(s).
+- Fine-grained filtering to only keep tags that enough people agree on.
+- Integrates with the Goodreads Plugin to provide tags for all of its results.
+
+## Special Notes
+
+- Requires Calibre 0.8 or later.
+- If used without the base Goodreads plugin, it will only get tags for books that have a goodreads identifier.
+
+## Installation Notes
+
+- Download the attached zip file and install the plugin as described in the [Introduction to plugins thread](https://www.mobileread.com/forums/showthread.php?t=118680).
+- Note that this is not a GUI plugin so it is not intended/cannot be added to context menus/toolbars etc.
+- Customize your desired genre -> tag mappings and other options from the Metadata download configuration screen. Hover over the ? symbols to get an explanation of what the various options do.
+
+## Version History
+
+<b>Version 1.0</b> - 04 August 2019  
+Initial release.
+

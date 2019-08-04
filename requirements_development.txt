@@ -1,3 +1,5 @@
 tox
+markdown
+selenium
 -rrequirements_tests.txt
 -rrequirements_style.txt
