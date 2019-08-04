@@ -1,3 +1,5 @@
+#!./scripts/kill-and-run.sh
+
 from calibre.gui2 import Application
 from calibre_plugins.goodreads_more_tags import GoodreadsMoreTags
 
