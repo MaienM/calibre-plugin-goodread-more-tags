@@ -9,7 +9,7 @@ from lxml.html import fromstring
 from calibre.ebooks.metadata.book.base import Metadata
 from calibre.utils.cleantext import clean_ascii_chars
 
-from .config import plugin_prefs, STORE_NAME, KEY_TRESHOLD_ABSOLUTE, KEY_TRESHOLD_PERCENTAGE, KEY_TRESHOLD_PERCENTAGE_OF, KEY_SHELF_MAPPINGS
+from .config import plugin_prefs, STORE_NAME, KEY_THRESHOLD_ABSOLUTE, KEY_THRESHOLD_PERCENTAGE, KEY_THRESHOLD_PERCENTAGE_OF, KEY_SHELF_MAPPINGS
 
 
 __license__ = 'BSD 3-clause'
@@ -21,20 +21,20 @@ URL_TEMPLATE = 'https://www.goodreads.com/book/shelves/{identifier}'
 
 class TagList(Counter):
     """ A list of tags with the amount of people that 'voted' for the tag. """
-    def apply_treshold(self, treshold):
+    def apply_threshold(self, threshold):
         """
-        Apply a treshold, removing all items with a value below the treshold.
+        Apply a threshold, removing all items with a value below the threshold.
 
         >>> c = TagList(a = 20, b = 10, c = 5, d = 3, e = 2, f = 1)
-        >>> c.apply_treshold(4)
+        >>> c.apply_threshold(4)
         >>> sorted(c.keys())
         ['a', 'b', 'c']
-        >>> c.apply_treshold(10)
+        >>> c.apply_threshold(10)
         >>> sorted(c.keys())
         ['a', 'b']
         """
         for key, count in self.items():
-            if count < treshold:
+            if count < threshold:
                 del self[key]
 
     def get_places(self, places):
@@ -125,33 +125,33 @@ class Worker(Thread):
                 tags[tag] += count
         self.log.debug('[{}] Tags after mapping: {}'.format(self.identifier, tags))
 
-        # Apply the absolute treshold.
-        treshold_abs = self.prefs[KEY_TRESHOLD_ABSOLUTE]
-        tags.apply_treshold(treshold_abs)
-        self.log.debug('[{}] Tags after applying absolute treshold: {}'.format(self.identifier, tags))
+        # Apply the absolute threshold.
+        threshold_abs = self.prefs[KEY_THRESHOLD_ABSOLUTE]
+        tags.apply_threshold(threshold_abs)
+        self.log.debug('[{}] Tags after applying absolute threshold: {}'.format(self.identifier, tags))
 
-        # Calculate the percentage treshold.
-        treshold_pct_places = self.prefs[KEY_TRESHOLD_PERCENTAGE_OF]
-        self.log.debug('[{}] Percentage treshold will be based on the tags in the following places: {}'.format(
+        # Calculate the percentage threshold.
+        threshold_pct_places = self.prefs[KEY_THRESHOLD_PERCENTAGE_OF]
+        self.log.debug('[{}] Percentage threshold will be based on the tags in the following places: {}'.format(
             self.identifier,
-            treshold_pct_places,
+            threshold_pct_places,
         ))
-        treshold_pct_items = filter(bool, tags.get_places(treshold_pct_places))
-        self.log.debug('[{}] Percentage treshold will be based on the following tags: {}'.format(
+        threshold_pct_items = filter(bool, tags.get_places(threshold_pct_places))
+        self.log.debug('[{}] Percentage threshold will be based on the following tags: {}'.format(
             self.identifier,
-            treshold_pct_items,
+            threshold_pct_items,
         ))
-        if treshold_pct_items:
-            treshold_pct_base = sum([item[1] for item in treshold_pct_items]) / len(treshold_pct_items)
+        if threshold_pct_items:
+            threshold_pct_base = sum([item[1] for item in threshold_pct_items]) / len(threshold_pct_items)
         else:
-            treshold_pct_base = 0
-        self.log.debug('[{}] Percentage treshold base is: {}'.format(self.identifier, treshold_pct_base))
-        treshold_pct = treshold_pct_base * self.prefs[KEY_TRESHOLD_PERCENTAGE] / 100
-        self.log.debug('[{}] Percentage treshold is: {}'.format(self.identifier, treshold_pct))
+            threshold_pct_base = 0
+        self.log.debug('[{}] Percentage threshold base is: {}'.format(self.identifier, threshold_pct_base))
+        threshold_pct = threshold_pct_base * self.prefs[KEY_THRESHOLD_PERCENTAGE] / 100
+        self.log.debug('[{}] Percentage threshold is: {}'.format(self.identifier, threshold_pct))
 
-        # Apply the percentage treshold.
-        tags.apply_treshold(treshold_pct)
-        self.log.debug('[{}] Tags after applying percentage treshold: {}'.format(self.identifier, tags))
+        # Apply the percentage threshold.
+        tags.apply_threshold(threshold_pct)
+        self.log.debug('[{}] Tags after applying percentage threshold: {}'.format(self.identifier, tags))
 
         # Store the results
         meta = Metadata(None)

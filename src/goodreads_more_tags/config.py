@@ -22,17 +22,21 @@ __docformat__ = 'markdown en'
 CONFIG_LOCATION = 'plugins/goodreads-more-tags'
 STORE_NAME = 'options'
 
-KEY_TRESHOLD_ABSOLUTE = 'tresholdAbsolute'
-KEY_TRESHOLD_PERCENTAGE = 'tresholdPercentage'
-KEY_TRESHOLD_PERCENTAGE_OF = 'tresholdPercentageOf'
+KEY_THRESHOLD_ABSOLUTE = 'thresholdAbsolute'
+KEY_THRESHOLD_PERCENTAGE = 'thresholdPercentage'
+KEY_THRESHOLD_PERCENTAGE_OF = 'thresholdPercentageOf'
 KEY_SHELF_MAPPINGS = 'shelfMappings'
 
-DEFAULT_TRESHOLD_ABSOLUTE = 10
-DEFAULT_TRESHOLD_PERCENTAGE = 30
-DEFAULT_TRESHOLD_PERCENTAGE_OF = [3, 4]
+KEY_OLD_THRESHOLD_ABSOLUTE = 'tresholdAbsolute'
+KEY_OLD_THRESHOLD_PERCENTAGE = 'tresholdPercentage'
+KEY_OLD_THRESHOLD_PERCENTAGE_OF = 'tresholdPercentageOf'
+
+DEFAULT_THRESHOLD_ABSOLUTE = 10
+DEFAULT_THRESHOLD_PERCENTAGE = 30
+DEFAULT_THRESHOLD_PERCENTAGE_OF = [3, 4]
 DEFAULT_SHELF_MAPPINGS = {
-    'adult-fiction': ['Adult'],
     'adult': ['Adult'],
+    'adult-fiction': ['Adult'],
     'adventure': ['Adventure'],
     'anthologies': ['Anthologies'],
     'art': ['Art'],
@@ -52,7 +56,6 @@ DEFAULT_SHELF_MAPPINGS = {
     'feminism': ['Feminism'],
     'gardening': ['Gardening'],
     'gay': ['Gay'],
-    'glbt': ['Gay'],
     'graphic-novels': ['Comics'],
     'graphic-novels-comics': ['Comics'],
     'graphic-novels-comics-manga': ['Comics'],
@@ -62,6 +65,7 @@ DEFAULT_SHELF_MAPPINGS = {
     'horror': ['Horror'],
     'humor': ['Humour'],
     'inspirational': ['Inspirational'],
+    'lgbt': ['Gay'],
     'manga': ['Comics'],
     'memoir': ['Biography'],
     'modern': ['Modern'],
@@ -92,14 +96,14 @@ DEFAULT_SHELF_MAPPINGS = {
     'war': ['War'],
     'western': ['Western'],
     'writing': ['Writing'],
-    'young-adult': ['Young Adult'],
     'ya': ['Young Adult'],
+    'young-adult': ['Young Adult'],
 }
 
 DEFAULT_STORE_VALUES = {
-    KEY_TRESHOLD_ABSOLUTE: DEFAULT_TRESHOLD_ABSOLUTE,
-    KEY_TRESHOLD_PERCENTAGE: DEFAULT_TRESHOLD_PERCENTAGE,
-    KEY_TRESHOLD_PERCENTAGE_OF: DEFAULT_TRESHOLD_PERCENTAGE_OF,
+    KEY_THRESHOLD_ABSOLUTE: DEFAULT_THRESHOLD_ABSOLUTE,
+    KEY_THRESHOLD_PERCENTAGE: DEFAULT_THRESHOLD_PERCENTAGE,
+    KEY_THRESHOLD_PERCENTAGE_OF: DEFAULT_THRESHOLD_PERCENTAGE_OF,
     KEY_SHELF_MAPPINGS: deepcopy(DEFAULT_SHELF_MAPPINGS)
 }
 
@@ -107,6 +111,16 @@ DEFAULT_STORE_VALUES = {
 plugin_prefs = JSONConfig(CONFIG_LOCATION)
 plugin_prefs.defaults[STORE_NAME] = DEFAULT_STORE_VALUES
 
+# Migrate settings.
+renamed = (
+    (KEY_OLD_THRESHOLD_ABSOLUTE, KEY_THRESHOLD_ABSOLUTE),
+    (KEY_OLD_THRESHOLD_PERCENTAGE, KEY_THRESHOLD_PERCENTAGE),
+    (KEY_OLD_THRESHOLD_PERCENTAGE_OF, KEY_THRESHOLD_PERCENTAGE_OF),
+)
+for old, new in renamed:
+    if old in plugin_prefs[STORE_NAME]:
+        plugin_prefs[STORE_NAME][new] = plugin_prefs[STORE_NAME][old]
+        del plugin_prefs[STORE_NAME][old]
 
 def docmd2html(text):
     """ Process a docstring with markdown to html. """
@@ -336,12 +350,12 @@ class ConfigWidget(DefaultConfigWidget):
         self.fields_view.setStyleSheet('QListView::item { margin: 2px 0; }')
         self.fields_view.setSelectionMode(qt.QAbstractItemView.NoSelection)
 
-        # A setting to determine the treshold of the amount of people that need to have put a book in a shelf before it
+        # A setting to determine the threshold of the amount of people that need to have put a book in a shelf before it
         # is considered.
-        self.treshold_abs = qt.QSpinBox()
-        self.treshold_abs.setMinimum(0)
-        self.treshold_abs.setValue(config[KEY_TRESHOLD_ABSOLUTE])
-        self.gb_ext.l.addRow('Treshold (absolute)', self.treshold_abs, description = docmd2html('''
+        self.threshold_abs = qt.QSpinBox()
+        self.threshold_abs.setMinimum(0)
+        self.threshold_abs.setValue(config[KEY_THRESHOLD_ABSOLUTE])
+        self.gb_ext.l.addRow('Threshold (absolute)', self.threshold_abs, description = docmd2html('''
             The minimum amount of people that have to have provided a tag before it will be included.
         '''))
 
@@ -374,14 +388,14 @@ class ConfigWidget(DefaultConfigWidget):
             `Self Help`       | 4
         '''
 
-        # A setting to determine the treshold of the amount of people that need to have put a book in a shelf before it
+        # A setting to determine the threshold of the amount of people that need to have put a book in a shelf before it
         # is considered, as a percentage of something else.
-        self.treshold_pct = qt.QDoubleSpinBox()
-        self.treshold_pct.setMinimum(0)
-        self.treshold_pct.setMaximum(100)
-        self.treshold_pct.setSuffix('%')
-        self.treshold_pct.setValue(config[KEY_TRESHOLD_PERCENTAGE])
-        self.gb_ext.l.addRow('Treshold (percentage)', self.treshold_pct, description = docmd2html((
+        self.threshold_pct = qt.QDoubleSpinBox()
+        self.threshold_pct.setMinimum(0)
+        self.threshold_pct.setMaximum(100)
+        self.threshold_pct.setSuffix('%')
+        self.threshold_pct.setValue(config[KEY_THRESHOLD_PERCENTAGE])
+        self.gb_ext.l.addRow('Threshold (percentage)', self.threshold_pct, description = docmd2html((
             '''
             The minimum amount of people that have to have provided a tag before it will be included, as a percentage
             of the total amount of people that have provided the top tag (or another metric, see the next setting).
@@ -393,16 +407,16 @@ class ConfigWidget(DefaultConfigWidget):
             and `Young Adult` tags will be included, but the `Non-Fiction` and `Self Help` tags will be ignored.
 
             Notice that this is tag based, not shelf based. In the above example, the `young-adult` and `ya` shelves
-            were below the treshold, but because they both map to the `Young Adult` tag, this tag had enough votes to be
+            were below the threshold, but because they both map to the `Young Adult` tag, this tag had enough votes to be
             included.
             '''
         )))
 
         # A setting to determine what the previous setting is based on.
-        self.treshold_pct_of = qt.QLineEdit()
-        self.treshold_pct_of.setValidator(qt.QRegExpValidator(qt.QRegExp(r'^[0-9]+(,\s*[0-9]+)*$')))
-        self.treshold_pct_of.setText(', '.join([str(p) for p in config[KEY_TRESHOLD_PERCENTAGE_OF]]))
-        self.gb_ext.l.addRow('Treshold percentage is based on', self.treshold_pct_of, description = docmd2html((
+        self.threshold_pct_of = qt.QLineEdit()
+        self.threshold_pct_of.setValidator(qt.QRegExpValidator(qt.QRegExp(r'^[0-9]+(,\s*[0-9]+)*$')))
+        self.threshold_pct_of.setText(', '.join([str(p) for p in config[KEY_THRESHOLD_PERCENTAGE_OF]]))
+        self.gb_ext.l.addRow('Threshold percentage is based on', self.threshold_pct_of, description = docmd2html((
             '''
             What the percentage specified in the previous setting is based on. This is expressed as a comma-separated
             list of numbers indicating the places that should be used. The average of the tags in these places will be
@@ -435,9 +449,9 @@ class ConfigWidget(DefaultConfigWidget):
 
         # Store the custom settings.
         prefs = {}
-        prefs[KEY_TRESHOLD_ABSOLUTE] = self.treshold_abs.value()
-        prefs[KEY_TRESHOLD_PERCENTAGE] = self.treshold_pct.value()
-        prefs[KEY_TRESHOLD_PERCENTAGE_OF] = [int(idx.strip()) for idx in self.treshold_pct_of.text().split(',')]
+        prefs[KEY_THRESHOLD_ABSOLUTE] = self.threshold_abs.value()
+        prefs[KEY_THRESHOLD_PERCENTAGE] = self.threshold_pct.value()
+        prefs[KEY_THRESHOLD_PERCENTAGE_OF] = [int(idx.strip()) for idx in self.threshold_pct_of.text().split(',')]
         prefs[KEY_SHELF_MAPPINGS] = self.table.get_mappings()
         plugin_prefs[STORE_NAME] = prefs
 
