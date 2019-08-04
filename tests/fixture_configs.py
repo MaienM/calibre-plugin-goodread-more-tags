@@ -42,6 +42,9 @@ def configs():
     goodreads.defaults = deepcopy(goodreads_original.defaults)
     goodreads_config.plugin_prefs = goodreads
 
+    # The tests were written when the default settings were different. For now, use the old defaults during the tests.
+    more_tags.defaults[more_tags_config.STORE_NAME][more_tags_config.KEY_THRESHOLD_PERCENTAGE] = 50
+
     yield Configs(msprefs, more_tags, goodreads)
 
     calibre_config.msprefs = msprefs_original
