@@ -169,4 +169,3 @@ class Worker(Thread):
         meta.tags = tags.keys()
         self.result_queue.put(meta)
 
-
