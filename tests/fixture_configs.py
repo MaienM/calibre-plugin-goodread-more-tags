@@ -66,9 +66,12 @@ def config_instances():
 
 @pytest.fixture(autouse = True)
 def reset_config_instances(config_instances):
-    for instance in config_instances:
-        for k, v in instance.defaults.items():
-            instance[k] = v
+    def reset():
+        for instance in config_instances:
+            for k, v in instance.defaults.items():
+                instance[k] = v
+    reset()
+    return reset
 
 
 @pytest.fixture
