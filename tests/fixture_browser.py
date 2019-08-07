@@ -3,6 +3,7 @@ from __future__ import with_statement
 
 from io import StringIO, BytesIO
 import mimetools
+import re
 import time
 
 import pytest
@@ -14,12 +15,16 @@ class MockBrowser(object):
         self._responses = []
 
     def add_response(self, url_regex, response):
-        self._responses.append((url_regex, response))
+        self._responses.append((re.compile(url_regex), response))
 
     def open_novisit(self, url, *args, **kwargs):
         for url_regex, response in self._responses:
             match = url_regex.match(url)
             if match:
+                if callable(response):
+                    response = response(match)
+                if response is None:
+                    continue
                 return MockResponse(url, 200, response)
         raise Exception('No mock response defined for ' + url)
 
@@ -57,7 +62,6 @@ def browser(monkeypatch):
     requests.
     """
     from calibre.utils.browser import Browser
-    from calibre.customize.ui import all_metadata_plugins
 
     browser = MockBrowser()
     monkeypatch.setattr(Browser, 'open_novisit', browser.open_novisit)

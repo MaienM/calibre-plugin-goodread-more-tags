@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import os.path
-import re
 import time
 from threading import Event, Thread
 
@@ -15,7 +14,6 @@ except ImportError:
 
 from calibre.customize.ui import find_plugin
 from calibre_plugins.goodreads import Goodreads
-from calibre_plugins.goodreads.config import STORE_NAME, KEY_GENRE_MAPPINGS
 from calibre_plugins.goodreads_more_tags import GoodreadsMoreTags
 import calibre_plugins.goodreads_more_tags.goodreads_integration as tm
 
@@ -28,8 +26,15 @@ def enable_integration():
 
 
 @pytest.fixture(autouse = True)
-def no_base_tags(configs):
-    configs.goodreads[STORE_NAME][KEY_GENRE_MAPPINGS] = {}
+def no_tags_from_other_plugins():
+    from calibre.customize.ui import all_metadata_plugins
+    for plugin in all_metadata_plugins():
+        if plugin.name == GoodreadsMoreTags.name:
+            continue
+
+        if 'ignore_fields' not in plugin.prefs:
+            plugin.prefs['ignore_fields'] = []
+        plugin.prefs['ignore_fields'].append('tags')
 
 
 class TestQueueHandler(object):
@@ -133,43 +138,38 @@ class TestInterceptMethod(object):
         assert self.sum(2, 4) == 16
 
 
+@pytest.mark.parametrize('execution_number', range(1))
 class TestIdentifyIntegrated(object):
-    def add_browser_mock(self, browser, url_regex, filename):
-        basedir = os.path.join(os.path.dirname(__file__), '_responses')
-        with open(os.path.join(basedir, filename), 'rb') as file:
-            browser.add_response(re.compile(url_regex), file.read())
-
     def setup_browser_mock(self, browser):
         basedir = os.path.join(os.path.dirname(__file__), '_responses')
-        self.add_browser_mock(browser, r'^https?://(www\.)?goodreads\.com/book/show/\d+\D*$', 'book-902715.html')
-        self.add_browser_mock(browser, r'^https?://(www\.)?goodreads\.com/book/shelves/\d+\D*$', 'shelves-902715.html')
-        self.add_browser_mock(browser, r'^https?://i\.gr-assets\.com/images/.*/books/.*/\d+\..*\.jpg$', 'cover-902715.jpg')
-        self.add_browser_mock(
-            browser,
-            r'^https?://(www\.)?goodreads\.com/book/auto_complete\?format=json&q=9780575077881$',
-            'autocomplete-9780575077881.json',
-        )
 
-    @pytest.mark.parametrize('execution_number', range(5))
+        def add(url_regex, filename_pattern):
+            def read_file(match):
+                filename = filename_pattern.format(**match.groupdict())
+                try:
+                    with open(os.path.join(basedir, filename), 'rb') as file:
+                        return file.read()
+                except IOError:
+                    print('Response file {} not found, not providing response'.format(filename))
+                    return None
+            browser.add_response(url_regex, read_file)
+
+        pre = r'^https?://(www\.)?'
+
+        add(pre + r'goodreads\.com/book/show/(?P<id>\d+)\D*$', 'goodreads-book-{id}.html')
+        add(pre + r'goodreads\.com/book/shelves/(?P<id>\d+)\D*$', 'goodreads-shelves-{id}.html')
+        add(pre + r'goodreads\.com/book/auto_complete\?.*&q=(?P<id>\d+)$', 'goodreads-autocomplete-{id}.json')
+        add(pre + r'i\.gr-assets\.com/images/.*/books/.*/\d+\..*\.jpg$', 'cover.jpg')
+
     def test_goodreads_id(self, identify, browser, execution_number):
         self.setup_browser_mock(browser)
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'goodreads': '902715' })
         assert len(results) == 1
-        assert sorted(results[0].tags) == [
-            'Adventure',
-            'Fantasy',
-            'Science Fiction',
-            'War',
-        ]
+        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
 
-    @pytest.mark.parametrize('execution_number', range(5))
     def test_isbn(self, identify, browser, execution_number):
         self.setup_browser_mock(browser)
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'isbn': '9780575077881' })
         assert len(results) == 1
-        assert sorted(results[0].tags) == [
-            'Adventure',
-            'Fantasy',
-            'Science Fiction',
-            'War',
-        ]
+        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
+
