@@ -11,6 +11,10 @@ from threading import Condition, Event, Lock
 # plugin.
 
 
+class QueueTimeoutError(Exception):
+    pass
+
+
 class QueueHandler(object):
     """
     This class handles the TemporaryQueue instances, making sure one (and only one) exists for a session.
@@ -68,7 +72,7 @@ class TemporaryQueue(object):
             self.queue.put(data)
             self.condition.notify()
 
-    def get(self):
+    def get(self, timeout = None):
         """
         Get a piece of data from the queue.
 
@@ -76,12 +80,16 @@ class TemporaryQueue(object):
         this will return None.
         """
         while not self.done.is_set() or not self.queue.empty():
-            try:
-                result = self.queue.get_nowait()
-                return result
-            except Empty:
-                with self.condition:
-                    self.condition.wait()
+            with self.condition:
+                try:
+                    result = self.queue.get_nowait()
+                    return result
+                except Empty:
+                    self.condition.wait(timeout = timeout)
+                    if self.queue.empty():
+                        # This means we hit the timeout, which either means the goodreads plugin is not running, or it
+                        # failed somehow.
+                        raise QueueTimeoutError()
 
     def kill(self):
         """ Indicates that no further data will arrive. """
@@ -116,6 +124,8 @@ def intercept_method(instance, method, interceptor):
 
 
 def intercept_Goodreads_identify(self, log, result_queue, abort, *args, **kwargs):
+    log.debug('[GoodreadsMoreTags] Integration active')
+
     # Store the abort instance, as it will be used as a session identifier.
     self.__abort_for_more_tags = abort
 
@@ -129,6 +139,7 @@ def intercept_Goodreads_Worker_init(self, *args, **kwargs):
 
     # Put the data for this worker on the appropriate queue, so that the identify() can start corresponding workers.
     identifier = self.plugin.id_from_url(self.url)[1]
+    self.log.debug('[GoodreadsMoreTags] Captured identifier {}'.format(identifier))
     shared_data = self.__shared_data_for_more_tags = SharedData(identifier)
     queue = QueueHandler.get_instance().get_queue(self.plugin.__abort_for_more_tags)
     queue.put(shared_data)
@@ -146,6 +157,10 @@ def intercept_Goodreads_Worker_run(self):
 
     # Run the regular worker.
     result = self._run_original()
+    self.log.debug('[GoodreadsMoreTags] Captured {} result(s) for {}'.format(
+        self.result_queue.qsize(),
+        shared_data.identifier,
+    ))
 
     # Add the results to the real result queue, and to the shared data, and then mark as done in the shared data.
     while not self.result_queue.empty():

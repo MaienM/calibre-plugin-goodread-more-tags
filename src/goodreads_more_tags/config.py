@@ -26,6 +26,7 @@ KEY_THRESHOLD_ABSOLUTE = 'thresholdAbsolute'
 KEY_THRESHOLD_PERCENTAGE = 'thresholdPercentage'
 KEY_THRESHOLD_PERCENTAGE_OF = 'thresholdPercentageOf'
 KEY_SHELF_MAPPINGS = 'shelfMappings'
+KEY_WAIT_FOR_GOODREADS_TIMEOUT = 'waitForGoodreadsTimeout'
 
 KEY_OLD_THRESHOLD_ABSOLUTE = 'tresholdAbsolute'
 KEY_OLD_THRESHOLD_PERCENTAGE = 'tresholdPercentage'
@@ -99,12 +100,14 @@ DEFAULT_SHELF_MAPPINGS = {
     'ya': ['Young Adult'],
     'young-adult': ['Young Adult'],
 }
+DEFAULT_WAIT_FOR_GOODREADS_TIMEOUT = 5
 
 DEFAULT_STORE_VALUES = {
     KEY_THRESHOLD_ABSOLUTE: DEFAULT_THRESHOLD_ABSOLUTE,
     KEY_THRESHOLD_PERCENTAGE: DEFAULT_THRESHOLD_PERCENTAGE,
     KEY_THRESHOLD_PERCENTAGE_OF: DEFAULT_THRESHOLD_PERCENTAGE_OF,
-    KEY_SHELF_MAPPINGS: deepcopy(DEFAULT_SHELF_MAPPINGS)
+    KEY_SHELF_MAPPINGS: deepcopy(DEFAULT_SHELF_MAPPINGS),
+    KEY_WAIT_FOR_GOODREADS_TIMEOUT: DEFAULT_WAIT_FOR_GOODREADS_TIMEOUT,
 }
 
 # Load/initialize preferences.
@@ -121,6 +124,7 @@ for old, new in renamed:
     if old in plugin_prefs[STORE_NAME]:
         plugin_prefs[STORE_NAME][new] = plugin_prefs[STORE_NAME][old]
         del plugin_prefs[STORE_NAME][old]
+
 
 def docmd2html(text):
     """ Process a docstring with markdown to html. """

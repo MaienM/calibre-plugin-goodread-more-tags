@@ -78,6 +78,8 @@ class Worker(Thread):
         self.url = URL_TEMPLATE.format(identifier = identifier)
         self.prefs = plugin_prefs[STORE_NAME]
 
+        self.log.debug('[{}] Created worker {}'.format(self.identifier, self.url))
+
     def run(self):
         # Try to grab the page contents.
         try:

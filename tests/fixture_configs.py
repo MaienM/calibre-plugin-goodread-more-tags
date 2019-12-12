@@ -89,6 +89,7 @@ def configs(monkeypatch, tmpdir):
         treshold_absolute = gmt_configmodule.KEY_THRESHOLD_ABSOLUTE,
         treshold_percentage = gmt_configmodule.KEY_THRESHOLD_PERCENTAGE,
         treshold_percentage_of = gmt_configmodule.KEY_THRESHOLD_PERCENTAGE_OF,
+        wait_for_goodreads_timeout = gmt_configmodule.KEY_WAIT_FOR_GOODREADS_TIMEOUT,
     )
 
     return Configs(goodreads_more_tags = gmt_config)
