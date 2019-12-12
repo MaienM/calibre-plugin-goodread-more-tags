@@ -1,7 +1,7 @@
-pytest ~= 3.6.0
-pluggy < 0.8
+mock
+pluggy
+pytest
 pytest-cov
 pytest-randomly
 pytest-timeout
 pytest-xdist
-mock
