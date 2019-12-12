@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import os.path
+import re
 import time
 from threading import Event, Thread
 
@@ -13,6 +14,7 @@ except ImportError:
     from mock import Mock
 
 from calibre.customize.ui import find_plugin
+from calibre.ebooks.metadata.sources.amazon import Amazon
 from calibre_plugins.goodreads import Goodreads
 from calibre_plugins.goodreads_more_tags import GoodreadsMoreTags
 import calibre_plugins.goodreads_more_tags.goodreads_integration as tm
@@ -138,9 +140,12 @@ class TestInterceptMethod(object):
         assert self.sum(2, 4) == 16
 
 
-@pytest.mark.parametrize('execution_number', range(1))
+@pytest.mark.parametrize('execution_number', range(10))
 class TestIdentifyIntegrated(object):
+    @pytest.fixture(autouse = True)
     def setup_browser_mock(self, browser):
+        failed_response = False
+
         basedir = os.path.join(os.path.dirname(__file__), '_responses')
 
         def add(url_regex, filename_pattern):
@@ -150,26 +155,80 @@ class TestIdentifyIntegrated(object):
                     with open(os.path.join(basedir, filename), 'rb') as file:
                         return file.read()
                 except IOError:
-                    print('Response file {} not found, not providing response'.format(filename))
+                    print('Response file {} not found, not providing response for {}'.format(filename, match.group(0)))
+                    failed_response = True
                     return None
             browser.add_response(url_regex, read_file)
 
         pre = r'^https?://(www\.)?'
 
+        # Goodreads
         add(pre + r'goodreads\.com/book/show/(?P<id>\d+)\D*$', 'goodreads-book-{id}.html')
         add(pre + r'goodreads\.com/book/shelves/(?P<id>\d+)\D*$', 'goodreads-shelves-{id}.html')
         add(pre + r'goodreads\.com/book/auto_complete\?.*&q=(?P<id>\d+)$', 'goodreads-autocomplete-{id}.json')
         add(pre + r'i\.gr-assets\.com/images/.*/books/.*/\d+\..*\.jpg$', 'cover.jpg')
 
-    def test_goodreads_id(self, identify, browser, execution_number):
-        self.setup_browser_mock(browser)
+        # Amazon/Amazon Multiple Countries
+        query_pattern = r'(%28)?(?P<id>\d+)\+.*site%3A(www\.)?amazon\.(?P<tld>[a-z.]+)'
+        add(pre + r'google\.com/search\?q=' + query_pattern, 'google-{id}-amazon.{tld}.html')
+        add(pre + r'webcache\.googleusercontent\.com/search\?q=cache:(?P<id>[^:]+):', 'google-result-{id}.html')
+        add(pre + r'bing\.com/search\?q=' + query_pattern, 'bing-{id}-amazon.{tld}.html')
+        add(pre + r'cc.bingj.com/cache.aspx\?.*&d=(?P<id>\d+)&', 'bing-result-{id}.html')
+
+        yield
+
+        assert not failed_response
+
+    @pytest.fixture(autouse = True)
+    def detect_deadlock(self, configs, identify):
+        # Since all browser results are mocked, all plugins should finish quickly, so set the timeouts to low values.
+        from calibre.ebooks.metadata.sources.prefs import msprefs
+        msprefs['wait_after_first_identify_result'] = 4
+        configs.goodreads_more_tags.wait_for_goodreads_timeout = 2
+
+        yield
+
+        # Detect if a timeout was hit.
+        for capture in identify.captures:
+            match = re.search(r'Still running sources:(\n.*)\n\n', capture.getvalue(), re.MULTILINE)
+            if match:
+                pytest.fail('Identify timed out, plugins not done: ' + match.group(1))
+
+    def test_goodreads_id(self, identify, execution_number):
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'goodreads': '902715' })
         assert len(results) == 1
         assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
 
-    def test_isbn(self, identify, browser, execution_number):
-        self.setup_browser_mock(browser)
+    def test_isbn(self, identify, execution_number):
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'isbn': '9780575077881' })
         assert len(results) == 1
         assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
 
+    def test_other_source_no_goodreads_id(self, identify, execution_number):
+        """
+        I found that when adding in a different source that will return an isbn, but not a goodreads id, merging
+        sometimes failes. Including all identifiers that goodreads returns in the goodreads more tags result resolves
+        this.
+        """
+        results = identify(
+            plugins = [Goodreads, GoodreadsMoreTags, Amazon],
+            identifiers = {
+                'amazon': '0385347308',
+                'goodreads': '18133416',
+            },
+        )
+        assert len(results) == 1
+
+    def test_other_source_no_goodreads_id_without_goodreads_plugin(self, identify, execution_number):
+        """
+        Similar to the previous test, but now without the goodreads plugin present. Merging should still succeed due to
+        the isbn being included in the returned identifiers.
+        """
+        results = identify(
+            plugins = [GoodreadsMoreTags, Amazon],
+            identifiers = {
+                'isbn': '9780385347303',
+                'goodreads': '18133416',
+            },
+        )
+        assert len(results) == 1
