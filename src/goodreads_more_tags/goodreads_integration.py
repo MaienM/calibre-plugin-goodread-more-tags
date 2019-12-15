@@ -88,7 +88,7 @@ class TemporaryQueue(object):
                     return result
                 except Empty:
                     self.condition.wait(timeout = timeout)
-                    if self.queue.empty():
+                    if not self.done.is_set() and self.queue.empty():
                         # This means we hit the timeout, which either means the goodreads plugin is not running, or it
                         # failed somehow.
                         raise QueueTimeoutError()
