@@ -125,6 +125,14 @@ class TestInterceptMethod(object):
         self.sum(1, 2)
         assert intercept.called
 
+    def test_intercept__is_not_called_if_disabled(self, configs):
+        intercept = Mock()
+        decorated = tm.skip_if_disabled(intercept)
+        tm.intercept_method(TestInterceptMethod, 'sum', decorated)
+        configs.goodreads_more_tags.integration_enabled = False
+        self.sum(1, 2)
+        assert not intercept.called
+
     def test_intercept__is_returned(self):
         def times(self, a, b):
             return a * b

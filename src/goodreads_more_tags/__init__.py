@@ -55,8 +55,9 @@ class GoodreadsMoreTags(Source):
         workers = []
         shared_data = {}
         temp_queue = Queue()
+        use_integration = self.is_integrated and plugin_prefs.get(KEY_INTEGRATION_ENABLED)
 
-        if self.is_integrated and plugin_prefs.get(KEY_INTEGRATION_ENABLED):
+        if use_integration:
             # Integration is enabled, so get the identifiers from the shared data.
             from .goodreads_integration import QueueHandler, QueueTimeoutError
             queue = QueueHandler.get_instance().get_queue(abort)
@@ -82,7 +83,7 @@ class GoodreadsMoreTags(Source):
         if len(workers) == 0:
             # It's possible to end up here when integration is enabled when it fails somehow. This can either be because
             # the goodreads plugin is disabled in this identify run, or because it found no results.
-            if self.is_integrated:
+            if use_integration:
                 log.warn('Got no results from the Goodreads plugin, proceeding without integration')
             # No integration, so only proceed if there is a known goodreads identifier.
             if 'goodreads' not in identifiers:

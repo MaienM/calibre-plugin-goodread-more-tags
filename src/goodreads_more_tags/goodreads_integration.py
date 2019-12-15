@@ -4,6 +4,8 @@ from __future__ import with_statement
 from Queue import Queue, Empty
 from threading import Condition, Event, Lock
 
+from .config import plugin_prefs, KEY_INTEGRATION_ENABLED
+
 
 # The goals of is to be able to provide tags for all results of the Goodreads plugin.
 # In order to do so, we want to start a Worker whenever the base Goodreads plugin starts a worker.
@@ -114,15 +116,26 @@ def intercept_method(instance, method, interceptor):
     return the method.
 
     The interceptor will be called in place of the original method. The original method will be available as a property
-    '_{method}_original' on the instance.
+    '_{method}_original' on the instance, and as a property `_original` on the interceptor.
     """
     key = '_{}_original'.format(method)
     if not getattr(instance, key, False):
         setattr(instance, key, getattr(instance, method))
     if getattr(instance, method) != interceptor:
         setattr(instance, method, interceptor)
+    interceptor._original = getattr(instance, key)
 
 
+def skip_if_disabled(func):
+    """ A decorator for interceptor methods that skips the interceptor if the intergation is disabled. """
+    def wrapper(*args, **kwargs):
+        if not plugin_prefs.get(KEY_INTEGRATION_ENABLED):
+            return func._original(*args, **kwargs)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@skip_if_disabled
 def intercept_Goodreads_identify(self, log, result_queue, abort, *args, **kwargs):
     log.debug('[GoodreadsMoreTags] Integration active')
 
@@ -133,6 +146,7 @@ def intercept_Goodreads_identify(self, log, result_queue, abort, *args, **kwargs
     return self._identify_original(log, result_queue, abort, *args, **kwargs)
 
 
+@skip_if_disabled
 def intercept_Goodreads_Worker_init(self, *args, **kwargs):
     # Run the regular init.
     self.___init___original(*args, **kwargs)
@@ -145,6 +159,7 @@ def intercept_Goodreads_Worker_init(self, *args, **kwargs):
     queue.put(shared_data)
 
 
+@skip_if_disabled
 def intercept_Goodreads_Worker_run(self):
     # The Goodreads plugin will only start running the workers after creating all of them, so we know that the
     # TemporaryQueue can be closed at this time.
