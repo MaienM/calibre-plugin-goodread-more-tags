@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
 
+import collections
 from copy import deepcopy
 
 import pytest
@@ -48,28 +49,49 @@ def config_dir(monkeypatch_s, tmpdir_s):
 
 @pytest.fixture(autouse = True, scope = 'session')
 def config_instances():
-    _config_instances = []
+    """ Keep track of all config instances, so that they can be reset to the defaults after every run. """
+    instances = collections.defaultdict(lambda: [])
+    def capture_instance(instance):
+        cls = instance.__class__
+        instances[cls].append(instance)
+        instance._test_id = '{}/{}'.format(cls.__name__, len(instances[cls]))
 
-    # Keep track of all configs, so that they can be reset to the defaults after every run.
-    from calibre.utils.config import JSONConfig
-    def __init__(self, *args, **kwargs):
-        _config_instances.append(self)
-        self._original___init__(*args, **kwargs)
-    JSONConfig._original___init__ = JSONConfig.__init__
-    JSONConfig.__init__ = __init__
+    import calibre.utils.config
+    config_classes = [calibre.utils.config.DynamicConfig, calibre.utils.config.XMLConfig]
 
-    yield _config_instances
+    # Setup capture for all new instances.
+    for cls in config_classes:
+        def __init__(self, *args, **kwargs):
+            capture_instance(self)
+            self._original___init__(*args, **kwargs)
+        cls._original___init__ = cls.__init__
+        cls.__init__ = __init__
 
-    JSONConfig.__init__ = JSONConfig._original___init__
-    del JSONConfig._original___init__
+    # Capture existing instances.
+    import sys
+    for name, module in sys.modules.items():
+        if not name.startswith('calibre'):
+            continue
+        if module is None:
+            continue
+        for vname, var in vars(module).items():
+            for cls in config_classes:
+                if isinstance(var, cls):
+                    capture_instance(var)
+                    break
+
+    yield [instance for cls_instances in instances.values() for instance in cls_instances]
+
+    for cls in config_classes:
+        cls.__init__ = cls._original___init__
+        del cls._original___init__
 
 
 @pytest.fixture(autouse = True)
 def reset_config_instances(config_instances):
     def reset():
         for instance in config_instances:
-            for k, v in instance.defaults.items():
-                instance[k] = v
+            instance.clear()
     reset()
     return reset
 
