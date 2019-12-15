@@ -390,7 +390,7 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
     def __init__(self, title = '', parent = None):
         super(CollapsibleGroupBox, self).__init__(parent)
 
-        self.toggle_button = QtWidgets.QToolButton(text = title, checkable = True, checked = False)
+        self.toggle_button = QtWidgets.QToolButton(text = title, checkable = True, checked = True)
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         self.toggle_button.setArrowType(QtCore.Qt.RightArrow)
@@ -416,17 +416,18 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
         self.setOpen(self.toggle_button.isChecked())
 
     def setOpen(self, should_be_open):
+        original_height = self.toggle_button.sizeHint().height()
+
         if should_be_open:
-            self.original_height = self.sizeHint().height()
-            self.toggle_button.setArrowType(QtCore.Qt.DownArrow )
+            self.toggle_button.setArrowType(QtCore.Qt.DownArrow)
             self.toggle_animation.setDirection(QtCore.QAbstractAnimation.Forward)
         else:
             self.toggle_button.setArrowType(QtCore.Qt.RightArrow)
             self.toggle_animation.setDirection(QtCore.QAbstractAnimation.Backward)
 
         content_height = self.content_area.layout().sizeHint().height()
-        self.setAnimation(0, self.original_height, self.original_height + content_height)
-        self.setAnimation(1, self.original_height, self.original_height + content_height)
+        self.setAnimation(0, original_height, original_height + content_height)
+        self.setAnimation(1, original_height, original_height + content_height)
         self.setAnimation(2, 0, content_height)
 
         self.toggle_animation.start()
@@ -446,7 +447,6 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
 class ConfigWidget(DefaultConfigWidget):
     def __init__(self, plugin):
         DefaultConfigWidget.__init__(self, plugin)
-        self.config = plugin_prefs[STORE_NAME]
 
         # By default, the settings contain a single groupbox with a listview in it. We want to make this a bit more
         # efficient (and pretty), so we will create a new hlayout for bot the default listview, as well as our custom
@@ -468,14 +468,13 @@ class ConfigWidget(DefaultConfigWidget):
         self.add_groupbox_goodreads_plugin_integration()
 
         # Finally, we add a custom widget to manage the shelf -> tags mappings.
-        self.table = ShelfTagMappingWidget(self, self.config[KEY_SHELF_MAPPINGS])
+        self.table = ShelfTagMappingWidget(self, plugin_prefs.get(KEY_SHELF_MAPPINGS))
         self.l.addWidget(self.table, self.l.rowCount(), 0, 1, self.l.columnCount())
         self.l.setRowStretch(self.l.rowCount() - 1, 1)
 
         # Open default groupboxes now. Cannot be done earlier because doing so before all items are laid out results in
         # some calculations returning the wrong values, messing up the layout.
         self.gb_thresholds.setOpen(True)
-        self.gb_integration.setOpen(True)
 
     def add_groupbox(self, name):
         gb = CollapsibleGroupBox(name)
@@ -491,7 +490,7 @@ class ConfigWidget(DefaultConfigWidget):
         # is considered.
         self.threshold_abs = qt.QSpinBox()
         self.threshold_abs.setMinimum(0)
-        self.threshold_abs.setValue(self.config[KEY_THRESHOLD_ABSOLUTE])
+        self.threshold_abs.setValue(plugin_prefs.get(KEY_THRESHOLD_ABSOLUTE))
         gb.l.addRow('Threshold (absolute)', self.threshold_abs, description = docmd2html('''
             The minimum amount of people that have to have provided a tag before it will be included.
         '''))
@@ -531,7 +530,7 @@ class ConfigWidget(DefaultConfigWidget):
         self.threshold_pct.setMinimum(0)
         self.threshold_pct.setMaximum(100)
         self.threshold_pct.setSuffix('%')
-        self.threshold_pct.setValue(self.config[KEY_THRESHOLD_PERCENTAGE])
+        self.threshold_pct.setValue(plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE))
         gb.l.addRow('Threshold (percentage)', self.threshold_pct, description = docmd2html((
             '''
             The minimum amount of people that have to have provided a tag before it will be included, as a percentage
@@ -552,7 +551,7 @@ class ConfigWidget(DefaultConfigWidget):
         # A setting to determine what the previous setting is based on.
         self.threshold_pct_of = qt.QLineEdit()
         self.threshold_pct_of.setValidator(qt.QRegExpValidator(qt.QRegExp(r'^[0-9]+(,\s*[0-9]+)*$')))
-        self.threshold_pct_of.setText(', '.join([str(p) for p in self.config[KEY_THRESHOLD_PERCENTAGE_OF]]))
+        self.threshold_pct_of.setText(', '.join([str(p) for p in plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE_OF)]))
         gb.l.addRow('Threshold percentage is based on', self.threshold_pct_of, description = docmd2html((
             '''
             What the percentage specified in the previous setting is based on. This is expressed as a comma-separated
@@ -581,7 +580,7 @@ class ConfigWidget(DefaultConfigWidget):
 
         # A setting to enable/disable the integration entirely.
         self.goodreads_enabled = qt.QCheckBox()
-        self.goodreads_enabled.setChecked(self.config[KEY_GOODREADS_INTEGRATION_ENABLED])
+        self.goodreads_enabled.setChecked(plugin_prefs.get(KEY_INTEGRATION_ENABLED))
         gb.l.addRow('Enabled', self.goodreads_enabled, description = docmd2html('''
             Whether to enable the integration with the Goodreads plugin (if present).
 
@@ -596,7 +595,7 @@ class ConfigWidget(DefaultConfigWidget):
         # A setting to determine how long to wait for the base Goodreads plugin to get results.
         self.goodreads_timeout = qt.QSpinBox()
         self.goodreads_timeout.setMinimum(0.1)
-        self.goodreads_timeout.setValue(self.config[KEY_GOODREADS_INTEGRATION_TIMEOUT])
+        self.goodreads_timeout.setValue(plugin_prefs.get(KEY_INTEGRATION_TIMEOUT))
         gb.l.addRow('Timeout', self.goodreads_timeout, description = docmd2html('''
             The amount of time (in seconds) to wait for the base Goodreads plugin to provide us with goodreads id(s).
 
