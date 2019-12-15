@@ -149,6 +149,7 @@ class TestInterceptMethod(object):
 
 
 @pytest.mark.parametrize('execution_number', range(10))
+@pytest.mark.timeout(30)
 class TestIdentifyIntegrated(object):
     @pytest.fixture(autouse = True)
     def setup_browser_mock(self, browser):
@@ -189,10 +190,12 @@ class TestIdentifyIntegrated(object):
 
     @pytest.fixture(autouse = True)
     def detect_deadlock(self, configs, identify):
-        # Since all browser results are mocked, all plugins should finish quickly, so set the timeouts to low values.
+        # Since all browser results are mocked, everything should complete fairly quickly. The main factor here is
+        # system load/speed, so set generous timeouts to avoid those from being issues, without risking being killed by
+        # the pytest timeouts.
         from calibre.ebooks.metadata.sources.prefs import msprefs
-        msprefs['wait_after_first_identify_result'] = 4
-        configs.goodreads_more_tags.wait_for_goodreads_timeout = 2
+        msprefs['wait_after_first_identify_result'] = 20
+        configs.goodreads_more_tags.integration_timeout = 10
 
         yield
 
@@ -205,12 +208,12 @@ class TestIdentifyIntegrated(object):
     def test_goodreads_id(self, identify, execution_number):
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'goodreads': '902715' })
         assert len(results) == 1
-        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
+        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Science Fiction', 'War']
 
     def test_isbn(self, identify, execution_number):
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'isbn': '9780575077881' })
         assert len(results) == 1
-        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Fiction', 'Science Fiction', 'War']
+        assert sorted(results[0].tags) == ['Adult', 'Adventure', 'Fantasy', 'Science Fiction', 'War']
 
     def test_other_source_no_goodreads_id(self, identify, execution_number):
         """
