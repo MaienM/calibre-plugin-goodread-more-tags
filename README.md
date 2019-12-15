@@ -27,6 +27,10 @@ of the genre -> tag mapping included in that plugin.
 
 ## Version History
 
+<b>Version 1.1</b> - 15 December 2019  
+Large internal changes that should resolve the problems with hanging/reliability.  
+There are now some settings for the integration with the base Goodreads plugin.
+
 <b>Version 1.0.1</b> - 04 August 2019  
 Fixed the spelling of threshold.
 
