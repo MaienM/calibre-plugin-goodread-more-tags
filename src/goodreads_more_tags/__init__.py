@@ -5,7 +5,7 @@ from Queue import Queue
 
 from calibre.ebooks.metadata.sources.base import Source
 
-from .config import plugin_prefs, STORE_NAME, KEY_WAIT_FOR_GOODREADS_TIMEOUT
+from .config import plugin_prefs, KEY_INTEGRATION_ENABLED, KEY_INTEGRATION_TIMEOUT
 
 __license__ = 'BSD 3-clause'
 __copyright__ = '2019, Michon van Dooren <michon1992@gmail.com>'
@@ -26,8 +26,6 @@ class GoodreadsMoreTags(Source):
 
     def __init__(self, *args, **kwargs):
         Source.__init__(self, *args, **kwargs)
-
-        self.config = plugin_prefs[STORE_NAME]
 
         # Try to inject into the regular Goodreads plugin. If this succeeds, this will provide data for use in our
         # identify (identifiers and results for all Goodreads results). If this fails, we do want to perform our
@@ -58,12 +56,12 @@ class GoodreadsMoreTags(Source):
         shared_data = {}
         temp_queue = Queue()
 
-        if self.is_integrated:
+        if self.is_integrated and plugin_prefs.get(KEY_INTEGRATION_ENABLED):
             # Integration is enabled, so get the identifiers from the shared data.
             from .goodreads_integration import QueueHandler, QueueTimeoutError
             queue = QueueHandler.get_instance().get_queue(abort)
             workers = []
-            timeout = self.config[KEY_WAIT_FOR_GOODREADS_TIMEOUT]
+            timeout = plugin_prefs.get(KEY_INTEGRATION_TIMEOUT)
             while not abort.is_set():
                 try:
                     shared_datum = queue.get(timeout = timeout)

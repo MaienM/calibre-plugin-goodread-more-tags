@@ -9,32 +9,77 @@ from calibre.gui2.complete2 import EditWithComplete
 from calibre.gui2.metadata.config import ConfigWidget as DefaultConfigWidget
 from calibre.utils.config import JSONConfig
 try:
-    from PyQt5 import Qt as QtGui
+    from PyQt5 import Qt as QtGui, QtCore, QtWidgets
     import PyQt5.Qt as qt
 except ImportError:
-    from PyQt4 import QtGui
+    from PyQt4 import QtGui, QtCore, QtWidgets
     import PyQt4.Qt as qt
 
 __license__ = 'BSD 3-clause'
 __copyright__ = '2019, Michon van Dooren <michon1992@gmail.com>'
 __docformat__ = 'markdown en'
 
+
+class NestingJSONConfig(JSONConfig):
+    """ A JSONConfig that allows passing keys like ['foo', 'bar'] to mean ['foo']['bar']. """
+    def _get_option_root(self, root, keys, create_as_needed = True):
+        for key in keys[:-1]:
+            if key not in root and create_as_needed:
+                root[key] = {}
+            root = root[key]
+        return root
+
+    def get(self, keys):
+        root = self._get_option_root(self, keys)
+        if keys[-1] not in root:
+            root[keys[-1]] = self.get_default(keys)
+        return root[keys[-1]]
+
+    def set(self, keys, value):
+        root = self._get_option_root(self, keys)
+        root[keys[-1]] = value
+
+    def get_default(self, keys):
+        root = self._get_option_root(self.defaults, keys, False)
+        return root[keys[-1]]
+
+    def set_default(self, keys, value):
+        root = self._get_option_root(self.defaults, keys)
+        root[keys[-1]] = value
+
+    def rename(self, old, new):
+        try:
+            old_root = self._get_option_root(self, old, False)
+            self.set(new, old_root[old[-1]])
+            del old_root[old[-1]]
+        except KeyError:
+            return
+
+        old.pop()
+        old_root = self._get_option_root(self, old, False)
+        while old and len(old_root[old[-1]]) == 0:
+            remove = old.pop()
+            del old_root[remove]
+            old_root = self._get_option_root(self, old, False)
+
+
 CONFIG_LOCATION = 'plugins/goodreads-more-tags'
-STORE_NAME = 'options'
 
-KEY_THRESHOLD_ABSOLUTE = 'thresholdAbsolute'
-KEY_THRESHOLD_PERCENTAGE = 'thresholdPercentage'
-KEY_THRESHOLD_PERCENTAGE_OF = 'thresholdPercentageOf'
-KEY_SHELF_MAPPINGS = 'shelfMappings'
-KEY_WAIT_FOR_GOODREADS_TIMEOUT = 'waitForGoodreadsTimeout'
+CATEGORY_THRESHOLD = 'thresholds'
+CATEGORY_INTEGRATION = 'goodreadsPluginIntegration'
 
-KEY_OLD_THRESHOLD_ABSOLUTE = 'tresholdAbsolute'
-KEY_OLD_THRESHOLD_PERCENTAGE = 'tresholdPercentage'
-KEY_OLD_THRESHOLD_PERCENTAGE_OF = 'tresholdPercentageOf'
+KEY_THRESHOLD_ABSOLUTE = [CATEGORY_THRESHOLD, 'absolute']
+KEY_THRESHOLD_PERCENTAGE = [CATEGORY_THRESHOLD, 'percentage']
+KEY_THRESHOLD_PERCENTAGE_OF = [CATEGORY_THRESHOLD, 'percentageOf']
+KEY_INTEGRATION_ENABLED = [CATEGORY_INTEGRATION, 'enabled']
+KEY_INTEGRATION_TIMEOUT = [CATEGORY_INTEGRATION, 'timeout']
+KEY_SHELF_MAPPINGS = ['shelfMappings']
 
 DEFAULT_THRESHOLD_ABSOLUTE = 10
 DEFAULT_THRESHOLD_PERCENTAGE = 30
 DEFAULT_THRESHOLD_PERCENTAGE_OF = [3, 4]
+DEFAULT_INTEGRATION_ENABLED = True
+DEFAULT_INTEGRATION_TIMEOUT = 10
 DEFAULT_SHELF_MAPPINGS = {
     'adult': ['Adult'],
     'adult-fiction': ['Adult'],
@@ -100,30 +145,30 @@ DEFAULT_SHELF_MAPPINGS = {
     'ya': ['Young Adult'],
     'young-adult': ['Young Adult'],
 }
-DEFAULT_WAIT_FOR_GOODREADS_TIMEOUT = 5
-
-DEFAULT_STORE_VALUES = {
-    KEY_THRESHOLD_ABSOLUTE: DEFAULT_THRESHOLD_ABSOLUTE,
-    KEY_THRESHOLD_PERCENTAGE: DEFAULT_THRESHOLD_PERCENTAGE,
-    KEY_THRESHOLD_PERCENTAGE_OF: DEFAULT_THRESHOLD_PERCENTAGE_OF,
-    KEY_SHELF_MAPPINGS: deepcopy(DEFAULT_SHELF_MAPPINGS),
-    KEY_WAIT_FOR_GOODREADS_TIMEOUT: DEFAULT_WAIT_FOR_GOODREADS_TIMEOUT,
-}
 
 # Load/initialize preferences.
-plugin_prefs = JSONConfig(CONFIG_LOCATION)
-plugin_prefs.defaults[STORE_NAME] = DEFAULT_STORE_VALUES
+plugin_prefs = NestingJSONConfig(CONFIG_LOCATION)
+plugin_prefs.set_default(KEY_THRESHOLD_ABSOLUTE, DEFAULT_THRESHOLD_ABSOLUTE)
+plugin_prefs.set_default(KEY_THRESHOLD_PERCENTAGE, DEFAULT_THRESHOLD_PERCENTAGE)
+plugin_prefs.set_default(KEY_THRESHOLD_PERCENTAGE_OF, DEFAULT_THRESHOLD_PERCENTAGE_OF)
+plugin_prefs.set_default(KEY_INTEGRATION_ENABLED, DEFAULT_INTEGRATION_ENABLED)
+plugin_prefs.set_default(KEY_INTEGRATION_TIMEOUT, DEFAULT_INTEGRATION_TIMEOUT)
+plugin_prefs.set_default(KEY_SHELF_MAPPINGS, deepcopy(DEFAULT_SHELF_MAPPINGS))
 
 # Migrate settings.
 renamed = (
-    (KEY_OLD_THRESHOLD_ABSOLUTE, KEY_THRESHOLD_ABSOLUTE),
-    (KEY_OLD_THRESHOLD_PERCENTAGE, KEY_THRESHOLD_PERCENTAGE),
-    (KEY_OLD_THRESHOLD_PERCENTAGE_OF, KEY_THRESHOLD_PERCENTAGE_OF),
+    # Old, misspelled options.
+    (['options', 'tresholdAbsolute'], KEY_THRESHOLD_ABSOLUTE),
+    (['options', 'tresholdPercentage'], KEY_THRESHOLD_PERCENTAGE),
+    (['options', 'tresholdPercentageOf'], KEY_THRESHOLD_PERCENTAGE_OF),
+    # Options from when everything was a single category.
+    (['options', 'thresholdAbsolute'], KEY_THRESHOLD_ABSOLUTE),
+    (['options', 'thresholdPercentage'], KEY_THRESHOLD_PERCENTAGE),
+    (['options', 'thresholdPercentageOf'], KEY_THRESHOLD_PERCENTAGE_OF),
+    (['options', 'shelfMappings'], KEY_SHELF_MAPPINGS),
 )
 for old, new in renamed:
-    if old in plugin_prefs[STORE_NAME]:
-        plugin_prefs[STORE_NAME][new] = plugin_prefs[STORE_NAME][old]
-        del plugin_prefs[STORE_NAME][old]
+    plugin_prefs.rename(old, new)
 
 
 def docmd2html(text):
@@ -324,42 +369,130 @@ class PseudoFormLayoutWithHelp(qt.QGridLayout):
 
         if not isinstance(label, qt.QLabel):
             label = qt.QLabel(label)
+        label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.addWidget(label, row, 0)
 
         if description:
             pixmap = qt.QIcon(I('dialog_question.png')).pixmap(16, 16)
             tooltip_icon = ToolTipIcon(pixmap, description)
+            tooltip_icon.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
             self.addWidget(tooltip_icon, row, 1)
 
         self.addWidget(widget, row, 2)
 
 
+class CollapsibleGroupBox(QtWidgets.QWidget):
+    """
+    A groupbox that can be collapsed.
+
+    Based on https://stackoverflow.com/a/52617714.
+    """
+    def __init__(self, title = '', parent = None):
+        super(CollapsibleGroupBox, self).__init__(parent)
+
+        self.toggle_button = QtWidgets.QToolButton(text = title, checkable = True, checked = False)
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.toggle_button.setArrowType(QtCore.Qt.RightArrow)
+        self.toggle_button.pressed.connect(self.onPressed)
+
+        self.content_area = QtWidgets.QScrollArea(maximumHeight = 0, minimumHeight = 0)
+        self.content_area.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.content_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+
+        self.toggle_animation = QtCore.QParallelAnimationGroup(self)
+        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self, b'minimumHeight'))
+        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self, b'maximumHeight'))
+        self.toggle_animation.addAnimation(QtCore.QPropertyAnimation(self.content_area, b'maximumHeight'))
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content_area)
+
+    @QtCore.pyqtSlot()
+    def onPressed(self):
+        self.setOpen(self.toggle_button.isChecked())
+
+    def setOpen(self, should_be_open):
+        if should_be_open:
+            self.original_height = self.sizeHint().height()
+            self.toggle_button.setArrowType(QtCore.Qt.DownArrow )
+            self.toggle_animation.setDirection(QtCore.QAbstractAnimation.Forward)
+        else:
+            self.toggle_button.setArrowType(QtCore.Qt.RightArrow)
+            self.toggle_animation.setDirection(QtCore.QAbstractAnimation.Backward)
+
+        content_height = self.content_area.layout().sizeHint().height()
+        self.setAnimation(0, self.original_height, self.original_height + content_height)
+        self.setAnimation(1, self.original_height, self.original_height + content_height)
+        self.setAnimation(2, 0, content_height)
+
+        self.toggle_animation.start()
+
+    def setContentLayout(self, layout):
+        oldLayout = self.content_area.layout()
+        del oldLayout
+        self.content_area.setLayout(layout)
+
+    def setAnimation(self, animationIndex, start, end):
+        animation = self.toggle_animation.animationAt(animationIndex)
+        animation.setDuration(500)
+        animation.setStartValue(start)
+        animation.setEndValue(end)
+
+
 class ConfigWidget(DefaultConfigWidget):
     def __init__(self, plugin):
         DefaultConfigWidget.__init__(self, plugin)
-        config = plugin_prefs[STORE_NAME]
+        self.config = plugin_prefs[STORE_NAME]
 
         # By default, the settings contain a single groupbox with a listview in it. We want to make this a bit more
-        # efficient (and pretty), so we will create a new groupbox that will replace the existing groupbox, which
-        # will contain all simple settings.
-        self.gb_ext = qt.QGroupBox('Settings')
-        self.gb_ext.l = PseudoFormLayoutWithHelp(self.gb_ext)
-        self.l.addWidget(self.gb_ext, *self.l.getItemPosition(self.l.indexOf(self.gb)))
+        # efficient (and pretty), so we will create a new hlayout for bot the default listview, as well as our custom
+        # groups.
+        self.w_ext = qt.QWidget()
+        self.l_ext = qt.QVBoxLayout(self.w_ext)
+        self.l.addWidget(self.w_ext, *self.l.getItemPosition(self.l.indexOf(self.gb)))
         self.l.removeWidget(self.gb)
         self.gb.hide()
 
-        # Now we want to move over the listview into the new groupbox. We'll also style it a bit.
+        # Now we want to move over the listview into the new layout. We'll also style it a bit.
         self.gb.l.removeWidget(self.fields_view)
-        self.gb_ext.l.addRow((self.gb.title() + ':').replace('::', ':'), self.fields_view)
+        self.l_ext.addWidget(self.fields_view)
         self.fields_view.setStyleSheet('QListView::item { margin: 2px 0; }')
         self.fields_view.setSelectionMode(qt.QAbstractItemView.NoSelection)
+
+        # Add all groupboxes for the various settings.
+        self.add_groupbox_thresholds()
+        self.add_groupbox_goodreads_plugin_integration()
+
+        # Finally, we add a custom widget to manage the shelf -> tags mappings.
+        self.table = ShelfTagMappingWidget(self, self.config[KEY_SHELF_MAPPINGS])
+        self.l.addWidget(self.table, self.l.rowCount(), 0, 1, self.l.columnCount())
+        self.l.setRowStretch(self.l.rowCount() - 1, 1)
+
+        # Open default groupboxes now. Cannot be done earlier because doing so before all items are laid out results in
+        # some calculations returning the wrong values, messing up the layout.
+        self.gb_thresholds.setOpen(True)
+        self.gb_integration.setOpen(True)
+
+    def add_groupbox(self, name):
+        gb = CollapsibleGroupBox(name)
+        gb.l = PseudoFormLayoutWithHelp()
+        gb.setContentLayout(gb.l)
+        self.l_ext.addWidget(gb)
+        return gb
+
+    def add_groupbox_thresholds(self):
+        gb = self.gb_thresholds = self.add_groupbox('Thresholds')
 
         # A setting to determine the threshold of the amount of people that need to have put a book in a shelf before it
         # is considered.
         self.threshold_abs = qt.QSpinBox()
         self.threshold_abs.setMinimum(0)
-        self.threshold_abs.setValue(config[KEY_THRESHOLD_ABSOLUTE])
-        self.gb_ext.l.addRow('Threshold (absolute)', self.threshold_abs, description = docmd2html('''
+        self.threshold_abs.setValue(self.config[KEY_THRESHOLD_ABSOLUTE])
+        gb.l.addRow('Threshold (absolute)', self.threshold_abs, description = docmd2html('''
             The minimum amount of people that have to have provided a tag before it will be included.
         '''))
 
@@ -398,8 +531,8 @@ class ConfigWidget(DefaultConfigWidget):
         self.threshold_pct.setMinimum(0)
         self.threshold_pct.setMaximum(100)
         self.threshold_pct.setSuffix('%')
-        self.threshold_pct.setValue(config[KEY_THRESHOLD_PERCENTAGE])
-        self.gb_ext.l.addRow('Threshold (percentage)', self.threshold_pct, description = docmd2html((
+        self.threshold_pct.setValue(self.config[KEY_THRESHOLD_PERCENTAGE])
+        gb.l.addRow('Threshold (percentage)', self.threshold_pct, description = docmd2html((
             '''
             The minimum amount of people that have to have provided a tag before it will be included, as a percentage
             of the total amount of people that have provided the top tag (or another metric, see the next setting).
@@ -419,8 +552,8 @@ class ConfigWidget(DefaultConfigWidget):
         # A setting to determine what the previous setting is based on.
         self.threshold_pct_of = qt.QLineEdit()
         self.threshold_pct_of.setValidator(qt.QRegExpValidator(qt.QRegExp(r'^[0-9]+(,\s*[0-9]+)*$')))
-        self.threshold_pct_of.setText(', '.join([str(p) for p in config[KEY_THRESHOLD_PERCENTAGE_OF]]))
-        self.gb_ext.l.addRow('Threshold percentage is based on', self.threshold_pct_of, description = docmd2html((
+        self.threshold_pct_of.setText(', '.join([str(p) for p in self.config[KEY_THRESHOLD_PERCENTAGE_OF]]))
+        gb.l.addRow('Threshold percentage is based on', self.threshold_pct_of, description = docmd2html((
             '''
             What the percentage specified in the previous setting is based on. This is expressed as a comma-separated
             list of numbers indicating the places that should be used. The average of the tags in these places will be
@@ -443,10 +576,33 @@ class ConfigWidget(DefaultConfigWidget):
             '''
         )))
 
-        # Finally, we add a custom widget to manage the shelf -> tags mappings.
-        self.table = ShelfTagMappingWidget(self, config[KEY_SHELF_MAPPINGS])
-        self.l.addWidget(self.table, self.l.rowCount(), 0, 1, self.l.columnCount())
-        self.l.setRowStretch(self.l.rowCount() - 1, 1)
+    def add_groupbox_goodreads_plugin_integration(self):
+        gb = self.gb_integration = self.add_groupbox('Goodreads Plugin Integration')
+
+        # A setting to enable/disable the integration entirely.
+        self.goodreads_enabled = qt.QCheckBox()
+        self.goodreads_enabled.setChecked(self.config[KEY_GOODREADS_INTEGRATION_ENABLED])
+        gb.l.addRow('Enabled', self.goodreads_enabled, description = docmd2html('''
+            Whether to enable the integration with the Goodreads plugin (if present).
+
+            If this is enabled, this plugin will attempt to grab any new goodreads ids found by the Goodreads plugin,
+            and will then lookup tags for these. This allows getting tags for books in the first metadata download.
+
+            If this is not enabled, this plugin will only get tags for books that already have a goodreads id when the
+            metadata download starts, based on this goodreads id. This means that a second metadata download will be
+            required if the goodreads id is added or changed in a download.
+        '''))
+
+        # A setting to determine how long to wait for the base Goodreads plugin to get results.
+        self.goodreads_timeout = qt.QSpinBox()
+        self.goodreads_timeout.setMinimum(0.1)
+        self.goodreads_timeout.setValue(self.config[KEY_GOODREADS_INTEGRATION_TIMEOUT])
+        gb.l.addRow('Timeout', self.goodreads_timeout, description = docmd2html('''
+            The amount of time (in seconds) to wait for the base Goodreads plugin to provide us with goodreads id(s).
+
+            If the Goodreads plugin is still running after this time, we will continue with any ids it has provided us with
+            already. If we've not received any ids from it, we will continue as if integration were not enabled.
+        '''))
 
     def commit(self):
         DefaultConfigWidget.commit(self)

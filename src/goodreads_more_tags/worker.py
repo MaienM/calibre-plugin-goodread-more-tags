@@ -9,7 +9,7 @@ from lxml.html import fromstring
 from calibre.ebooks.metadata.book.base import Metadata
 from calibre.utils.cleantext import clean_ascii_chars
 
-from .config import plugin_prefs, STORE_NAME, KEY_THRESHOLD_ABSOLUTE, KEY_THRESHOLD_PERCENTAGE, KEY_THRESHOLD_PERCENTAGE_OF, KEY_SHELF_MAPPINGS
+from .config import plugin_prefs, KEY_THRESHOLD_ABSOLUTE, KEY_THRESHOLD_PERCENTAGE, KEY_THRESHOLD_PERCENTAGE_OF, KEY_SHELF_MAPPINGS
 
 
 __license__ = 'BSD 3-clause'
@@ -76,7 +76,6 @@ class Worker(Thread):
 
         self.browser = plugin.browser.clone_browser()
         self.url = URL_TEMPLATE.format(identifier = identifier)
-        self.prefs = plugin_prefs[STORE_NAME]
 
         self.log.debug('[{}] Created worker {}'.format(self.identifier, self.url))
 
@@ -119,7 +118,7 @@ class Worker(Thread):
 
         # Map the shelves to the corresponding tags.
         tags = TagList()
-        mapping = self.prefs[KEY_SHELF_MAPPINGS]
+        mapping = plugin_prefs.get(KEY_SHELF_MAPPINGS)
         for name, count in shelves.items():
             if name not in mapping:
                 continue
@@ -128,7 +127,7 @@ class Worker(Thread):
         self.log.debug('[{}] Tags after mapping: {}'.format(self.identifier, tags))
 
         # Apply the absolute threshold.
-        threshold_abs = self.prefs[KEY_THRESHOLD_ABSOLUTE]
+        threshold_abs = plugin_prefs.get(KEY_THRESHOLD_ABSOLUTE)
         tags.apply_threshold(threshold_abs)
         self.log.debug('[{}] Tags after applying absolute threshold ({}): {}'.format(
             self.identifier,
@@ -137,7 +136,7 @@ class Worker(Thread):
         ))
 
         # Calculate the percentage threshold.
-        threshold_pct_places = self.prefs[KEY_THRESHOLD_PERCENTAGE_OF]
+        threshold_pct_places = plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE_OF)
         threshold_pct_items = filter(bool, tags.get_places(threshold_pct_places))
         self.log.debug('[{}] Percentage threshold will be based on the following tags ({}): {}'.format(
             self.identifier,
@@ -148,10 +147,10 @@ class Worker(Thread):
             threshold_pct_base = sum([item[1] for item in threshold_pct_items]) / len(threshold_pct_items)
         else:
             threshold_pct_base = 0
-        threshold_pct = threshold_pct_base * self.prefs[KEY_THRESHOLD_PERCENTAGE] / 100
+        threshold_pct = threshold_pct_base * plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE) / 100
         self.log.debug('[{}] Percentage threshold is {}% of {}'.format(
             self.identifier,
-            self.prefs[KEY_THRESHOLD_PERCENTAGE],
+            plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE),
             threshold_pct_base,
         ))
 

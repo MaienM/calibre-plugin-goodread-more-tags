@@ -28,10 +28,10 @@ class ConfigWrapper(object):
             setattr(cls, name, prop)
 
     def getter(self, key):
-        return lambda s: s.prefs[key]
+        return lambda s: s.get(key)
 
     def setter(self, key):
-        return lambda s, v: s.prefs.__setitem__(key, v)
+        return lambda s, v: s.prefs.set(key, v)
 
 
 @pytest.fixture(autouse = True, scope = 'session')
@@ -85,11 +85,12 @@ def configs(monkeypatch, tmpdir):
     # Wrap the config to make it easier to change.
     import calibre_plugins.goodreads_more_tags.config as gmt_configmodule
     gmt_config = ConfigWrapper(
-        gmt_configmodule.plugin_prefs[gmt_configmodule.STORE_NAME],
+        gmt_configmodule.plugin_prefs,
         treshold_absolute = gmt_configmodule.KEY_THRESHOLD_ABSOLUTE,
         treshold_percentage = gmt_configmodule.KEY_THRESHOLD_PERCENTAGE,
         treshold_percentage_of = gmt_configmodule.KEY_THRESHOLD_PERCENTAGE_OF,
-        wait_for_goodreads_timeout = gmt_configmodule.KEY_WAIT_FOR_GOODREADS_TIMEOUT,
+        integration_enabled = gmt_configmodule.KEY_GOODREADS_INTEGRATION_ENABLED,
+        integration_timeout = gmt_configmodule.KEY_GOODREADS_INTEGRATION_TIMEOUT,
     )
 
     return Configs(goodreads_more_tags = gmt_config)
