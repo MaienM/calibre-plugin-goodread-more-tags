@@ -4,6 +4,7 @@ from __future__ import with_statement
 
 import collections
 from copy import deepcopy
+import os.path
 
 import pytest
 
@@ -36,15 +37,23 @@ class ConfigWrapper(object):
 
 
 @pytest.fixture(autouse = True, scope = 'session')
-def config_dir(monkeypatch_s, tmpdir_s):
+def config_dir(monkeypatch_s, tmpdir_s, config_instances):
     """
     Use a clean config location.
 
     Without this the configs of the actual calibre instance are used (and modified), which is undesirable.
     """
     import calibre.constants
-    config_dir = str(tmpdir_s.join('config'))
-    monkeypatch_s.setattr(calibre.constants, 'config_dir', config_dir)
+    config_dir = tmpdir_s.join('config')
+    monkeypatch_s.setattr(calibre.constants, 'config_dir', str(config_dir))
+
+    # Change the file paths of existing instances.
+    for instance in config_instances:
+        if getattr(instance, 'file_path', None) is not None:
+            try:
+                instance.file_path = str(config_dir.join(os.path.basename(instance.file_path)))
+            except AttributeError:
+                pass # DynamicConfig has a dynamically calculated file_path.
 
 
 @pytest.fixture(autouse = True, scope = 'session')
@@ -54,6 +63,7 @@ def config_instances():
     def capture_instance(instance):
         cls = instance.__class__
         instances[cls].append(instance)
+        # Mark with unique id, for debugging purposes.
         instance._test_id = '{}/{}'.format(cls.__name__, len(instances[cls]))
 
     import calibre.utils.config
