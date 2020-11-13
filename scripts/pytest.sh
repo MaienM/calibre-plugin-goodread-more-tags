@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 ./scripts/kill-and-run.sh
 
@@ -13,5 +13,5 @@ MIN_TESTS_PER_PROC=2
 	[ "$useprocs" -le "$numprocs" ] || useprocs="$numprocs"
 	[ "$useprocs" -gt 0 ] || useprocs=1
 
-	pytest -vv --numprocesses="$useprocs" "$@"
+	pytest -vv --numprocesses="$useprocs" --randomly-seed="$RANDOM" "$@"
 )
