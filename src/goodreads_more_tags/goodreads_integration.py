@@ -6,7 +6,7 @@ try:
 except:
     # Python 2.x
     from Queue import Queue, Empty
-from threading import Condition, Event, Lock
+from threading import Condition, Event, RLock
 
 from .config import plugin_prefs, KEY_INTEGRATION_ENABLED
 
@@ -31,8 +31,9 @@ class QueueHandler(object):
     This is intended to used as a singleton.
     """
     def __init__(self):
-        self.lock = Lock()
+        self.lock = RLock()
         self.queues = {}
+        self.conditions = {}
 
     @classmethod
     def get_instance(cls):
@@ -41,12 +42,33 @@ class QueueHandler(object):
             cls._instance = QueueHandler()
         return cls._instance
 
-    def get_queue(self, abort):
-        """ Get a TemporaryQueue instance for the given session. """
+    def create_queue(self, abort):
+        """ Create a new TemporaryQueue instance for the given session. Will fail if one already exists. """
         with self.lock:
-            if abort not in self.queues:
-                self.queues[abort] = TemporaryQueue()
+            if abort in self.queues:
+                raise KeyError('A queue already exists for this instance.')
+            self.queues[abort] = TemporaryQueue()
+            if abort in self.conditions:
+                condition = self.conditions[abort]
+                with condition:
+                    # Store queue on the condition so the waiting calls receive it even if it is immediately removed
+                    condition.queue = self.queues[abort]
+                    condition.notify_all()
+                del self.conditions[abort]
             return self.queues[abort]
+
+    def get_queue(self, abort, timeout = None):
+        """ Get a TemporaryQueue instance for the given session. Will block if one has not yet been created. """
+        with self.lock:
+            if abort in self.queues:
+                return self.queues[abort]
+            if abort not in self.conditions:
+                self.conditions[abort] = Condition(self.lock)
+            condition = self.conditions[abort]
+            with condition:
+                if not condition.wait(timeout):
+                    raise QueueTimeoutError()
+            return condition.queue
 
     def remove_queue(self, abort):
         """ Remove a TemporaryQueue instance that is no longer needed. """
@@ -143,6 +165,9 @@ def skip_if_disabled(func):
 def intercept_Goodreads_identify(self, log, result_queue, abort, *args, **kwargs):
     log.debug('[GoodreadsMoreTags] Integration active')
 
+    # Create the queue as a marker that Goodreads is active during this run.
+    QueueHandler.get_instance().create_queue(abort)
+
     # Store the abort instance, as it will be used as a session identifier.
     self.__abort_for_more_tags = abort
 
@@ -166,8 +191,9 @@ def intercept_Goodreads_Worker_init(self, *args, **kwargs):
 @skip_if_disabled
 def intercept_Goodreads_Worker_run(self):
     # The Goodreads plugin will only start running the workers after creating all of them, so we know that the
-    # TemporaryQueue can be closed at this time.
-    QueueHandler.get_instance().remove_queue(self.plugin.__abort_for_more_tags)
+    # TemporaryQueue can be closed at this time. We cannot safely remove it yet though as we cannot be certain the GMT
+    # plugin has grabbed it yet.
+    QueueHandler.get_instance().get_queue(self.plugin.__abort_for_more_tags).kill()
 
     # Use a different queue to capture the results.
     shared_data = self.__shared_data_for_more_tags

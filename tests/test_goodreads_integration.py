@@ -46,35 +46,66 @@ class TestQueueHandler(object):
     def test_get_instance__same(self):
         assert tm.QueueHandler.get_instance() == tm.QueueHandler.get_instance()
 
-    def test_get_queue__type(self):
+    def test_create_queue__type(self):
         handler = tm.QueueHandler.get_instance()
         abort = Event()
-        assert isinstance(handler.get_queue(abort), tm.TemporaryQueue)
+        assert isinstance(handler.create_queue(abort), tm.TemporaryQueue)
 
-    def test_get_queue__same_instance_for_key(self):
+    def test_create_queue__forbid_multiple_calls_for_key(self):
         handler = tm.QueueHandler.get_instance()
         abort = Event()
-        assert handler.get_queue(abort) == handler.get_queue(abort)
+        assert handler.create_queue(abort) is not None
+        with pytest.raises(KeyError):
+            handler.create_queue(abort)
 
-    def test_get_queue__different_instance_per_key(self):
+    def test_create_queue__different_instance_per_key(self):
         handler = tm.QueueHandler.get_instance()
         abort1 = Event()
         abort2 = Event()
-        assert handler.get_queue(abort1) != handler.get_queue(abort2)
+        assert handler.create_queue(abort1) != handler.create_queue(abort2)
+
+    def test_get_queue__wait_timeout(self):
+        handler = tm.QueueHandler.get_instance()
+        abort = Event()
+        with pytest.raises(tm.QueueTimeoutError):
+            handler.get_queue(abort, 0.1)
+
+    def test_get_queue__get_after_create(self):
+        handler = tm.QueueHandler.get_instance()
+        abort = Event()
+
+        queue = handler.create_queue(abort)
+        assert queue is not None
+        assert handler.get_queue(abort) == queue
+
+    def test_get_queue__create_after_get(self):
+        handler = tm.QueueHandler.get_instance()
+        abort = Event()
+        queue = None
+
+        def add_delayed():
+            nonlocal queue
+            time.sleep(0.2)
+            queue = handler.create_queue(abort)
+
+        Thread(target = add_delayed).start()
+
+        gotten_queue = handler.get_queue(abort)
+        assert queue == gotten_queue
 
     def test_remove_queue__new_instance(self):
         handler = tm.QueueHandler.get_instance()
         abort = Event()
-        oldqueue = handler.get_queue(abort)
+        oldqueue = handler.create_queue(abort)
         handler.remove_queue(abort)
-        newqueue = handler.get_queue(abort)
+        newqueue = handler.create_queue(abort)
         assert newqueue is not None
         assert newqueue != oldqueue
 
     def test_remove_queue__kill(self):
         handler = tm.QueueHandler.get_instance()
         abort = Event()
-        queue = handler.get_queue(abort)
+        queue = handler.create_queue(abort)
         queue.kill = Mock()
         handler.remove_queue(abort)
         assert queue.kill.called
@@ -204,6 +235,9 @@ class TestIdentifyIntegrated(object):
             match = re.search(r'Still running sources:(\n.*)\n\n', capture.getvalue(), re.MULTILINE)
             if match:
                 pytest.fail('Identify timed out, plugins not done: ' + match.group(1))
+            match = re.search('Timeout .* while waiting for results from the Goodreads plugin.', capture.getvalue())
+            if match:
+                pytest.fail('Integration timed out.')
 
     def test_goodreads_id(self, identify, execution_number):
         results = identify(plugins = [Goodreads, GoodreadsMoreTags], identifiers = { 'goodreads': '902715' })
@@ -242,4 +276,5 @@ class TestIdentifyIntegrated(object):
                 'goodreads': '18133416',
             },
         )
+        assert any('skipping integration for this run' in capture.getvalue() for capture in identify.captures)
         assert len(results) == 1

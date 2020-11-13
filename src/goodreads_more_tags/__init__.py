@@ -64,7 +64,15 @@ class GoodreadsMoreTags(Source):
         if use_integration:
             # Integration is enabled, so get the identifiers from the shared data.
             from .goodreads_integration import QueueHandler, QueueTimeoutError
-            queue = QueueHandler.get_instance().get_queue(abort)
+            try:
+                queue = QueueHandler.get_instance().get_queue(abort, 1)
+            except QueueTimeoutError:
+                use_integration = False
+                log.debug((
+                    'Goodreads plugin seems to not be active for this identify, '
+                    'skipping integration for this run.'
+                ))
+        if use_integration:
             workers = []
             timeout = plugin_prefs.get(KEY_INTEGRATION_TIMEOUT)
             while not abort.is_set():
@@ -77,6 +85,8 @@ class GoodreadsMoreTags(Source):
                     ).format(timeout))
                     break
                 if shared_datum is None:
+                    # The queue is done, so it can now be removed.
+                    QueueHandler.get_instance().remove_queue(abort)
                     break
                 log.debug('Received identifier from Goodreads plugin: {}'.format(shared_datum.identifier))
                 worker = Worker(self, shared_datum.identifier, log = log, result_queue = temp_queue, **kwargs)
@@ -85,8 +95,7 @@ class GoodreadsMoreTags(Source):
                 workers.append(worker)
 
         if len(workers) == 0:
-            # It's possible to end up here when integration is enabled when it fails somehow. This can either be because
-            # the goodreads plugin is disabled in this identify run, or because it found no results.
+            # It's possible to end up here when integration is enabled when it fails to find any results.
             if use_integration:
                 log.warn('Got no results from the Goodreads plugin, proceeding without integration')
             # No integration, so only proceed if there is a known goodreads identifier.
