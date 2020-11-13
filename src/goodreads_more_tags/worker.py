@@ -33,7 +33,7 @@ class TagList(Counter):
         >>> sorted(c.keys())
         ['a', 'b']
         """
-        for key, count in self.items():
+        for key, count in list(self.items()):
             if count < threshold:
                 del self[key]
 
@@ -137,7 +137,7 @@ class Worker(Thread):
 
         # Calculate the percentage threshold.
         threshold_pct_places = plugin_prefs.get(KEY_THRESHOLD_PERCENTAGE_OF)
-        threshold_pct_items = filter(bool, tags.get_places(threshold_pct_places))
+        threshold_pct_items = list(filter(bool, tags.get_places(threshold_pct_places)))
         self.log.debug('[{}] Percentage threshold will be based on the following tags ({}): {}'.format(
             self.identifier,
             threshold_pct_places,
@@ -167,6 +167,6 @@ class Worker(Thread):
         for k, v in self.data.items():
             meta.set(k, v)
         meta.set_identifier('goodreads', self.identifier)
-        meta.tags = tags.keys()
+        meta.tags = list(tags.keys())
         self.result_queue.put(meta)
 

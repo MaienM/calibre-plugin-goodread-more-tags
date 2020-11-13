@@ -1,7 +1,11 @@
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-from Queue import Queue, Empty
+try:
+    from queue import Queue, Empty
+except:
+    # Python 2.x
+    from Queue import Queue, Empty
 from threading import Condition, Event, Lock
 
 from .config import plugin_prefs, KEY_INTEGRATION_ENABLED

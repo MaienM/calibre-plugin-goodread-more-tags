@@ -14,5 +14,5 @@ def fix_underscore():
     This fixture sets the global _ in all modules to be exactly that, to avoid issues in calibre.
     """
     for name, module in sys.modules.items():
-        if module is not None:
+        if module is not None and hasattr(module, '_'):
             module._ = gettext

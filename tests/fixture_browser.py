@@ -1,8 +1,7 @@
 from __future__ import unicode_literals
 from __future__ import with_statement
 
-from io import StringIO, BytesIO
-import mimetools
+from io import BytesIO
 import re
 import time
 
@@ -25,34 +24,23 @@ class MockBrowser(object):
                     response = response(match)
                 if response is None:
                     continue
-                return MockResponse(url, 200, response)
+                return MockResponse(response)
         raise Exception('No mock response defined for ' + url)
 
 
 class MockResponse(object):
     """ A mock response object for the mock browser. """
-    def __init__(self, url, status, data):
-        if isinstance(data, bytes):
-            self._data = BytesIO(data)
-        else:
-            data = str(data)
-            self._data = StringIO(data)
+    def __init__(self, data):
+        self.data = BytesIO(data)
 
-        self._url = url
-        self._status = status
-        self._headers = mimetools.Message(StringIO('Content-Length: ' + str(len(data))))
-
-    def read(self, *args):
-        return self._data.read(*args)
-
-    def geturl(self):
-        return self._url
+        self._info = {}
+        self._info['Content-Length'] = len(data)
 
     def info(self):
-        return self._headers
+        return self._info
 
-    def getcode(self):
-        return self._status
+    def read(self, size=-1):
+        return self.data.read(size)
 
 
 @pytest.fixture

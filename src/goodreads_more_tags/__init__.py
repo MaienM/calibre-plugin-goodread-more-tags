@@ -1,7 +1,11 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from Queue import Queue
+try:
+    from queue import Queue
+except:
+    # Python 2.x
+    from Queue import Queue
 
 from calibre.ebooks.metadata.sources.base import Source
 

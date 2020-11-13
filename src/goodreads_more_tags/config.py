@@ -216,7 +216,7 @@ class ShelfTagMappingTableWidget(qt.QTableWidget):
         mappings = {}
         for i in range(0, self.rowCount()):
             label = self.item(i, 0).text().strip()
-            tags = filter(len, [t.strip() for t in self.cellWidget(i, 1).text().split(',')])
+            tags = list(filter(len, [t.strip() for t in self.cellWidget(i, 1).text().split(',')]))
             mappings[label] = tags
         return mappings
 
@@ -226,7 +226,7 @@ class ShelfTagMappingTableWidget(qt.QTableWidget):
 
         # Load data.
         self.setRowCount(len(mappings))
-        for i, (shelf, tags) in enumerate(sorted(mappings.iteritems(), key = lambda x: x[0])):
+        for i, (shelf, tags) in enumerate(sorted(mappings.items(), key = lambda x: x[0])):
             # Set the label for the shelf name.
             label = qt.QTableWidgetItem(shelf, qt.QTableWidgetItem.UserType)
             label.setFlags(qt.Qt.ItemIsSelectable | qt.Qt.ItemIsEnabled)

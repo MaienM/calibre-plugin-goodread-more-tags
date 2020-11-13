@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 import sys
-from io import BytesIO, TextIOWrapper
+from io import StringIO
 from threading import Event
 
 import pytest
@@ -29,9 +29,9 @@ def identify():
         # capsys/capfs do not work, unfortunately.
         from calibre.utils.logging import FileStream
         log = create_log(sys.stdout)
-        capture = BytesIO()
+        capture = StringIO()
         captures.append(capture)
-        log.outputs.append(FileStream(TextIOWrapper(capture, encoding = 'ascii')))
+        log.outputs.append(FileStream(capture))
 
         # Run the regular identify function.
         abort = Event()
