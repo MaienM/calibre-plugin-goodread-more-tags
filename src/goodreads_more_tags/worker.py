@@ -162,6 +162,12 @@ class Worker(Thread):
             tags,
         ))
 
+        if len(tags) == 0:
+            self.log.debug('[{}] No tags remain after mapping + filtering, skipping this one'.format(
+                self.identifier,
+            ))
+            return
+
         # Store the results
         meta = Metadata(None)
         for k, v in self.data.items():
