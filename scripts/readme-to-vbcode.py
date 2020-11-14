@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import re
+import time
 
 from markdown import markdown
 from selenium import webdriver
@@ -12,6 +13,7 @@ with open('README.md') as f:
 
 driver = webdriver.Chrome()
 driver.get('http://www.seabreezecomputers.com/html2bbcode/')
+time.sleep(1)
 
 textarea = driver.find_element_by_name('textbox')
 textarea.clear()
