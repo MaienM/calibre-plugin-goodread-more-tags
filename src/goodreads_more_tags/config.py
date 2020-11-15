@@ -607,12 +607,10 @@ class ConfigWidget(DefaultConfigWidget):
         DefaultConfigWidget.commit(self)
 
         # Store the custom settings.
-        prefs = {}
-        prefs[KEY_THRESHOLD_ABSOLUTE] = self.threshold_abs.value()
-        prefs[KEY_THRESHOLD_PERCENTAGE] = self.threshold_pct.value()
-        prefs[KEY_THRESHOLD_PERCENTAGE_OF] = [int(idx.strip()) for idx in self.threshold_pct_of.text().split(',')]
-        prefs[KEY_SHELF_MAPPINGS] = self.table.get_mappings()
-        plugin_prefs[STORE_NAME] = prefs
+        plugin_prefs.set(KEY_THRESHOLD_ABSOLUTE, self.threshold_abs.value())
+        plugin_prefs.set(KEY_THRESHOLD_PERCENTAGE, self.threshold_pct.value())
+        plugin_prefs.set(KEY_THRESHOLD_PERCENTAGE_OF, [int(idx.strip()) for idx in self.threshold_pct_of.text().split(',')])
+        plugin_prefs.set(KEY_SHELF_MAPPINGS, self.table.get_mappings())
 
     def resizeEvent(self, event):
         DefaultConfigWidget.resizeEvent(self, event)

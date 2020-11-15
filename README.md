@@ -29,7 +29,8 @@ of the genre -> tag mapping included in that plugin.
 
 <b>Unreleased</b>  
 Fixed an error in adding a new shelf to the mapping.  
-Fixed an error in removing a shelf from the mapping.
+Fixed an error in removing a shelf from the mapping.  
+Fixed an error in saving the preferences.
 
 <b>Version 1.2.0</b> - 14 November 2020  
 Update to work with Calibre 5/Python 3.  
