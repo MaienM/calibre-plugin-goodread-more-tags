@@ -317,7 +317,7 @@ class ShelfTagMappingWidget(qt.QWidget):
 
     def delete_mapping(self):
         # Check whether anything is selected.
-        shelf = self.get_selected_shelf()
+        shelf = self.table.get_selected_shelf()
         if not shelf:
             return
 
