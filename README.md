@@ -27,7 +27,7 @@ of the genre -> tag mapping included in that plugin.
 
 ## Version History
 
-<b>Unreleased</b>  
+<b>Version 1.2.1</b> - 15 November 2020  
 Fixed an error in adding a new shelf to the mapping.  
 Fixed an error in removing a shelf from the mapping.  
 Fixed an error in saving the preferences.

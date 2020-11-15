@@ -21,7 +21,7 @@ class GoodreadsMoreTags(Source):
     description = 'Scrape more tags from Goodreads'
     author = 'Michon van Dooren'
 
-    version = (1, 2, 0)
+    version = (1, 2, 1)
     minimum_calibre_version = (0, 7, 53)
     supported_platforms = ['windows', 'osx', 'linux']
 
