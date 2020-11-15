@@ -302,7 +302,7 @@ class ShelfTagMappingWidget(qt.QWidget):
         )
         if not ok:
             return
-        shelf = unicode(shelf).strip()
+        shelf = shelf.strip()
         if not shelf:
             return
 

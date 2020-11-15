@@ -27,9 +27,12 @@ of the genre -> tag mapping included in that plugin.
 
 ## Version History
 
+<b>Unreleased</b>  
+Fixed an error in adding a new shelf to the mapping.
+
 <b>Version 1.2.0</b> - 14 November 2020  
 Update to work with Calibre 5/Python 3.  
-Speed up the case where the Goodreads plugin is installed but not currently enabled as a metadata source.
+Speed up the case where the Goodreads plugin is installed but not currently enabled as a metadata source.  
 Don't provide any results if the list of tags after mapping + filtering is empty.
 
 <b>Version 1.1.0</b> - 15 December 2019  
