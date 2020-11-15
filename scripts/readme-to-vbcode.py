@@ -39,7 +39,7 @@ vbcode = re.sub('\n(\[url)', r' \1', vbcode)
 vbcode = vbcode.replace('&gt;', '>')
 vbcode = vbcode.split('\n')
 vhindex = vbcode.index([l for l in vbcode if 'Version History' in l][0])
-vbcode.insert(vhindex + 2, '[SPOILER]')
+vbcode[vhindex + 1] = '[SPOILER]'
 vbcode.append('[/SPOILER]')
 vbcode = '\n'.join(vbcode)
 print(vbcode)
